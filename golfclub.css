@@ -1,0 +1,270 @@
+/* Mobile-first styling: layout verticale con mappa sopra e carte sotto */
+:root {
+    --bg: #d0f7d5; /* verde prato chiaro */
+    --card: #fffaf0; /* bianco crema leggero */
+    --accent: #1f8feb; /* blu accent */
+    --accent-dark: #1565c0;
+    --muted: #4b4b4b; /* grigio scuro per testo secondario */
+    --topbar-bg: rgba(255,255,255,0.85);
+    --shadow: rgba(0,0,0,0.15);
+    --tile-green: #85d183; /* verde green */
+    --tile-fairway: #a3e27a; /* verde fairway */
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body, #mapCanvas {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: #0b1220;
+}
+
+/* Layout generale */
+.app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Topbar con info */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--topbar-bg);
+    border-bottom: 2px solid #cce0cc;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 2px 6px var(--shadow);
+}
+
+    /* Bottoni di telecamera */
+    .topbar button {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+
+        .topbar button:hover {
+            background: var(--accent-dark);
+            transform: translateY(-2px);
+        }
+
+/* Mappa */
+.map-wrap {
+    flex: 0 0 auto;
+    padding: 8px;
+}
+
+#mapCanvas {
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 6px 18px var(--shadow);
+    background: linear-gradient(to bottom, #b9f29d 0%, #80e080 70%, #8ce660 100%);
+}
+
+/* Deck delle carte */
+.cards {
+    flex: 0 0 auto;
+    padding: 0 12px 0 12px;
+    background: transparent;
+}
+
+.deck-label {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #2e4b2e;
+    text-align: center;
+}
+
+.deck {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.horizontal-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px
+}
+
+/* Deck delle carte: due righe, scroll orizzontale */
+#clubsDeck, #specialDeck {
+    display: grid;
+    grid-auto-flow: column; /* le carte si dispongono in colonne */
+    grid-template-rows: repeat(2, min-content); /* due righe */
+    gap: 10px; /* spazio tra le carte */
+    overflow-x: auto; /* scroll orizzontale */
+    overflow-y: hidden; /* niente scroll verticale */
+    padding: 8px 0;
+    scroll-behavior: smooth;
+}
+
+/* Carte più larghe */
+.card {
+    min-width: 160px; /* più larga */
+    padding: 10px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--card);
+    transition: transform 0.2s;
+}
+
+    .card:hover {
+        transform: translateY(-4px);
+    }
+
+    /* Titolo e descrizione centrati */
+    .card .title {
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .card .sub, .card .desc {
+        font-size: 0.85rem;
+        text-align: center;
+    }
+
+.hint.small {
+    font-size: .82rem;
+    color: var(--muted);
+    margin-top: 8px
+}
+
+
+/* Simple tile legend for debug (optional) */
+.legend {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px
+}
+
+    .legend .item {
+        font-size: 12px;
+        padding: 6px;
+        border-radius: 6px;
+        background: #fff
+    }
+
+.scoreboard {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #e0ffe0; /* verde prato chiaro */
+    border: 3px solid #4caf50; /* bordo verde scuro */
+    border-radius: 16px;
+    padding: 16px 20px; /* ridotto padding */
+    z-index: 9999;
+    font-family: 'Arial', sans-serif;
+    text-align: center;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25); /* leggermente meno pesante */
+    min-width: 280px; /* ridotto da 350px */
+    max-width: 90%; /* adatta anche su mobile */
+}
+
+    .scoreboard h2 {
+        margin-top: 0;
+        color: #2e7d32; /* verde scuro */
+        font-size: 1.5rem; /* leggermente più piccolo */
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+
+.score-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px; /* ridotto margine */
+}
+
+    .score-row div {
+        flex: 1;
+        padding: 4px; /* ridotto padding */
+        margin: 0 1px; /* ridotto gap */
+        background: #ffffffcc; /* bianco semitrasparente */
+        border-radius: 6px;
+        font-weight: bold;
+        color: #333;
+        font-size: 0.85rem; /* più compatto */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+        .score-row div:last-child {
+            background: #4caf50; /* colonna totale */
+            color: white;
+        }
+
+.next-hole-btn, .btn {
+    margin-top: 12px;
+    padding: 8px 14px; /* più compatto */
+    border-radius: 10px;
+    background: linear-gradient(145deg, #66bb6a, #43a047);
+    color: white;
+    border: none;
+    font-size: 0.95rem; /* leggermente più piccolo */
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+    .next-hole-btn:hover, .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+/* Colori per tipologia mazza */
+.card.driver {
+    background: #4a4a4a; /* grigio scuro */
+    color: white;
+}
+
+.card.wood {
+    background: #8b5a2b; /* marrone legno */
+    color: white;
+}
+
+.card.iron {
+    background: #c0c0c0; /* grigio chiaro */
+    color: black;
+}
+
+.card.wedge, .card.sand, .card.pitch {
+    background: #32bbed; /* grigio / argento */
+    color: black;
+}
+
+/* Piccola animazione al passaggio del mouse */
+.card:hover {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+/* Titolo e descrizione leggibili */
+.card .title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.card .sub {
+    font-size: 0.85rem;
+}
+
+/* Scroll deck più carino */
+.deck.horizontal-scroll {
+    scroll-behavior: smooth;
+}

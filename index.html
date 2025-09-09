@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Mini Golf - Card Game</title>
+    <link rel="stylesheet" href="golfclub.css">
+</head>
+<body>
+    <main class="app">
+        <!-- Header / scoreboard -->
+        <header class="topbar">
+            <div class="hole-info">
+                Buca <span id="holeNumber">1</span><br />
+                Par <span id="holePar">4</span>
+            </div>
+
+            <button id="camUpBtn">↑</button>
+            <button id="camDownBtn">↓</button>
+
+            <div class="strokes">
+                Colpi: <span id="strokes">0</span><br />
+                <span id="windDir">→</span> <span id="windInt">0</span>
+            </div>
+
+            <div class="distance-info">
+                Lunghezza: <span id="holeLength">0</span><br />
+                Percorso: <span id="travelledDistance">0</span>
+            </div>
+        </header>
+
+        <!-- Game map (canvas) -->
+        <section class="map-wrap">
+            <canvas id="mapCanvas" width="400" height="400" aria-label="Mappa del campo"></canvas>
+        </section>
+
+
+        <!-- Card area -->
+        <section class="cards">
+            <div class="deck-label">Mazzi</div>
+            <div id="clubsDeck" class="deck horizontal-scroll"></div>
+            <div class="deck-label">Carte Speciali</div>
+            <div id="specialDeck" class="deck horizontal-scroll"></div>
+        </section>
+
+
+    </main>
+
+
+    <script src="golfdeck.js"></script>
+    <script src="golfclub.js"></script>
+    <script src="gamemanager.js"></script>
+</body>
+</html>
