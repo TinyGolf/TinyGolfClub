@@ -1,13 +1,12 @@
+//golfclub.js
 (function () {
     'use strict';
     window.addEventListener('DOMContentLoaded', () => {
-        const clubs = window.Clubs;
-        const specials = window.Specials;
-        let viewRowStart = 20;
-        let zoomedOut = false; // nuovo stato zoom
+
+        let viewRowStart = 40;
         // configurazione griglia (coerente con spec)
         let COLS = 20;
-        let ROWS_TOTAL = 40;
+        let ROWS_TOTAL = 60;
         let VIEW_COLS = 20;
         let VIEW_ROWS = 20;
 
@@ -45,18 +44,22 @@
         function calculateDistance(r1, c1, r2, c2) {
             const dr = r2 - r1;
             const dc = c2 - c1;
-            return Math.round(Math.sqrt(dr * dr + dc * dc));
+            return Math.round((Math.sqrt(dr * dr + dc * dc)-1)*10);
         }
         function updateDistances() {
             const teePos = findTeePosition();
             const holePos = hole;
 
+            // Distanza percorsa dalla pallina dal tee
             const travelled = calculateDistance(teePos.row, teePos.col, ball.row, ball.col);
-            const remaining = calculateDistance(ball.row, ball.col, holePos.row, holePos.col);
 
+            // Lunghezza totale buca
+            const totalLength = calculateDistance(teePos.row, teePos.col, holePos.row, holePos.col);
+
+            // Aggiorna DOM
             document.getElementById("travelledDistance").textContent = travelled;
+            document.getElementById("holeLength").textContent = totalLength;
         }
-
 
         // Generazione procedurale: fairway che percorre tutte le righe fino alla buca (tra 30 e 37)
         window.generateMap = function (par, difficulty) {
@@ -82,7 +85,7 @@
             } else {
                 teeCol = 2 + Math.floor(Math.random() * (COLS - 7));
             }
-            const teeRow = 36 + Math.floor(Math.random() * 3);
+            const teeRow = 55 + Math.floor(Math.random() * 3);
 
             // Costruzione tee box smussato 3x5x3
             for (let r = teeRow; r < teeRow + 3; r++) {
@@ -101,10 +104,19 @@
 
             // --- GREEN (smussato) ---
             let greenMinRow, greenMaxRow;
-            if (par === 3) { greenMinRow = 30; greenMaxRow = 24; }
-            else if (par === 4) { greenMinRow = 20; greenMaxRow = 10; }
-            else { greenMinRow = 4; greenMaxRow = 0; }
 
+            // Distanze base dalla tee row per difficoltà 3
+            let baseDistMin, baseDistMax;
+            if (par === 3) { baseDistMin = 11; baseDistMax = 17; }  // par3: green a 11-17 righe sopra
+            else if (par === 4) { baseDistMin = 27; baseDistMax = 35; } // par4
+            else { baseDistMin = 47; baseDistMax = 53; } // par5
+
+            // Fattore scaling difficoltà: 3=normale, 2=avvicina, 1=ancora più vicine
+            let diffFactor = difficulty === 3 ? 1 : (difficulty === 2 ? 0.85 : 0.75);
+
+            // Calcola greenMinRow / greenMaxRow in base al tee
+            greenMinRow = teeRow - Math.round(baseDistMax * diffFactor);
+            greenMaxRow = teeRow - Math.round(baseDistMin * diffFactor);
             // Dimensione green
             const greenH = 4 + Math.floor(Math.random() * 4); // altezza
             const greenW = 4 + Math.floor(Math.random() * 4); // larghezza
@@ -157,14 +169,30 @@
             }
 
             // --- FAIRWAY ---
+            // Offset dal tee (inizio fairway) e dal green (fine fairway)
+            const greenArea = getGreenArea();
+            const greenBottomRow = greenArea.maxR;
+            const startOffsetMin = 2;
+            const startOffsetMax = 6;
+            const endOffsetMin = 0;
+            const endOffsetMax = 4;
+
+            // Calcola riga di partenza/fine fairway con randomizzazione
+            const fairwayStartRow = teeRow - (startOffsetMin + Math.floor(Math.random() * (startOffsetMax - startOffsetMin + 1)));
+            const fairwayEndRow = greenBottomRow + (endOffsetMin + Math.floor(Math.random() * (endOffsetMax - endOffsetMin + 1)));
+
             let currentCol = ball.col;
-            for (let r = teeRow - 1; r >= greenRow + greenH; r--) {
+            for (let r = fairwayStartRow; r >= fairwayEndRow; r--) {
                 // Larghezza base del fairway ridotta con difficoltà
-                const fwWidth = Math.max(1, 6 - difficulty); // più difficile → fairway più stretti
+                const fwBase = Math.max(1, 6 - difficulty);
+
+                // Larghezza variabile (±1 tile) per rendere il fairway più naturale
+                const fwWidth = fwBase + (Math.random() < 0.5 ? -1 : 1);
+                const halfWidth = Math.floor(fwWidth / 2);
 
                 // Calcolo colonne percorse
-                const startCol = currentCol - Math.floor(fwWidth / 2);
-                const endCol = currentCol + Math.floor(fwWidth / 2);
+                const startCol = currentCol - halfWidth;
+                const endCol = currentCol + halfWidth;
 
                 for (let c = startCol; c <= endCol; c++) {
                     if (c >= 0 && c < COLS) mapGrid[r][c] = TILE.FAIRWAY;
@@ -175,11 +203,12 @@
                 if (Math.random() < shiftProb) {
                     currentCol += Math.random() < 0.5 ? -1 : 1;
                     // vincola il fairway alle colonne centrali in base a difficoltà
-                    const minCol = 2 + difficulty; // più difficile → meno colonne disponibili a sinistra
-                    const maxCol = COLS - 3 - difficulty; // più difficile → meno colonne disponibili a destra
+                    const minCol = 2 + difficulty;
+                    const maxCol = COLS - 3 - difficulty;
                     currentCol = Math.max(minCol, Math.min(maxCol, currentCol));
                 }
             }
+
 
             // --- BUNKER PATCHES ---
             const bunkersAlongFairway = [1, 2, 2]; // difficoltà 1 → 1, 2 → 2, 3 → 2
@@ -267,7 +296,7 @@
         };
 
         // Inizio torneo o nuova buca: genera vento casuale
-        window.generateWind = function(difficulty) {
+        window.generateWind = function (difficulty) {
             // Intensità massima per difficoltà
             const maxIntensity = difficulty === 1 ? 2 : difficulty === 2 ? 3 : 4;
 
@@ -280,7 +309,7 @@
 
             console.log(`Vento generato: direzione=${wind.direction.toFixed(2)} rad, intensità=${wind.intensity.toFixed(2)}`);
         }
-        window.updateWindDisplay = function() {
+        window.updateWindDisplay = function () {
             const dirSymbols = ['→', '↗', '↓', '↘', '←', '↙', '↑', '↖'];
             const dirs = [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, -3 * Math.PI / 4, -Math.PI / 2, -Math.PI / 4];
             // trova indice direzione più vicina
@@ -307,7 +336,7 @@
         }
 
         // --- Render aggiornato con frecce sul green ---
-        window.render = function() {
+        window.render = function () {
             fitCanvas();
             const cssW = canvas.clientWidth;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -443,54 +472,53 @@
 
             const greenZoomRows = greenRows * scale;
             const greenZoomCols = greenCols * scale;
-            let holePlaced = false;
 
             const offsetR = Math.floor((zoomSize - greenZoomRows) / 2);
             const offsetC = Math.floor((zoomSize - greenZoomCols) / 2);
 
+            let holePlaced = false;
+
             for (let r = 0; r < greenRows; r++) {
-    for (let c = 0; c < greenCols; c++) {
-        const tile = mapGrid[minR + r][minC + c];
+                for (let c = 0; c < greenCols; c++) {
+                    const tile = mapGrid[minR + r][minC + c];
 
-        for (let rr = 0; rr < scale; rr++) {
-            for (let cc = 0; cc < scale; cc++) {
-                const zoomR = offsetR + r * scale + rr;
-                const zoomC = offsetC + c * scale + cc;
-                if (zoomR < 0 || zoomR >= zoomSize || zoomC < 0 || zoomC >= zoomSize) continue;
+                    for (let rr = 0; rr < scale; rr++) {
+                        for (let cc = 0; cc < scale; cc++) {
+                            const zoomR = offsetR + r * scale + rr;
+                            const zoomC = offsetC + c * scale + cc;
+                            if (zoomR < 0 || zoomR >= zoomSize || zoomC < 0 || zoomC >= zoomSize) continue;
 
-                // --- Imposta verde per tutte le sotto-tile della buca ---
-                if (tile === TILE.GREEN || tile === TILE.HOLE) {
-                    zoomGrid[zoomR][zoomC] = TILE.GREEN;
-                }
+                            // Se la tile originale è GREEN o HOLE, riempi la sotto-tile con GREEN di base
+                            if (tile === TILE.GREEN || tile === TILE.HOLE) {
+                                zoomGrid[zoomR][zoomC] = TILE.GREEN;
+                            }
 
-                // --- Solo la tile centrale diventa HOLE ---
-                if (tile === TILE.HOLE && !holePlaced) {
-                    const centerR = offsetR + r * scale + Math.floor(scale / 2);
-                    const centerC = offsetC + c * scale + Math.floor(scale / 2);
+                            // Se la tile originale è HOLE, solo la cella centrale del blocco diventa HOLE
+                            if (tile === TILE.HOLE && !holePlaced) {
+                                const centerR = offsetR + r * scale + Math.floor(scale / 2);
+                                const centerC = offsetC + c * scale + Math.floor(scale / 2);
 
-                    if (zoomR === centerR && zoomC === centerC) {
-                        zoomGrid[zoomR][zoomC] = TILE.HOLE;
-                        holePlaced = true;
-                        hole.rowZoom = centerR;
-                        hole.colZoom = centerC;
+                                if (zoomR === centerR && zoomC === centerC) {
+                                    zoomGrid[zoomR][zoomC] = TILE.HOLE;
+                                    holePlaced = true;
+                                    hole.rowZoom = centerR;
+                                    hole.colZoom = centerC;
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
-    }
-}
 
-            // --- Procedural relievi sul green ---
-            // 1️⃣ BOWL/HILL ad anelli
+            // --- Procedural relievi sul green (resta identico) ---
             const numReliefs = 2 + Math.floor(Math.random() * 3); // 2–4 anelli
-
             for (let p = 0; p < numReliefs; p++) {
                 const centerR = offsetR + Math.floor(Math.random() * greenZoomRows);
                 const centerC = offsetC + Math.floor(Math.random() * greenZoomCols);
 
-                const outerRadius = 4 + Math.floor(Math.random() * 3); // raggio esterno 2–4
-                const innerRadius = 1 + Math.floor(outerRadius / 2);   // raggio interno almeno metà di outerRadius
-                const type = Math.random() < 0.5 ? "BOWL" : "HILL";   // verso centro o verso esterno
+                const outerRadius = 4 + Math.floor(Math.random() * 3);
+                const innerRadius = 1 + Math.floor(outerRadius / 2);
+                const type = Math.random() < 0.5 ? "BOWL" : "HILL";
 
                 for (let r = Math.max(0, centerR - outerRadius); r <= Math.min(zoomSize - 1, centerR + outerRadius); r++) {
                     for (let c = Math.max(0, centerC - outerRadius); c <= Math.min(zoomSize - 1, centerC + outerRadius); c++) {
@@ -499,54 +527,48 @@
                         const dr = r - centerR;
                         const dc = c - centerC;
                         const distance = Math.sqrt(dr * dr + dc * dc);
+                        if (distance < innerRadius || distance > outerRadius) continue;
 
-                        if (distance >= innerRadius && distance <= outerRadius) {
-                            let dir;
-                            // freccia verso centro o verso esterno
-                            if (type === "BOWL") {
-                                // verso centro
-                                dir = Math.abs(dr) > Math.abs(dc) ? (dr > 0 ? "UP" : "DOWN") : (dc > 0 ? "LEFT" : "RIGHT");
-                            } else {
-                                // verso esterno
-                                dir = Math.abs(dr) > Math.abs(dc) ? (dr > 0 ? "DOWN" : "UP") : (dc > 0 ? "RIGHT" : "LEFT");
-                            }
-
-                            slopeGridLocal[r][c] = dir;
+                        let dir;
+                        if (type === "BOWL") {
+                            dir = Math.abs(dr) > Math.abs(dc) ? (dr > 0 ? "UP" : "DOWN") : (dc > 0 ? "LEFT" : "RIGHT");
+                        } else {
+                            dir = Math.abs(dr) > Math.abs(dc) ? (dr > 0 ? "DOWN" : "UP") : (dc > 0 ? "RIGHT" : "LEFT");
                         }
+                        slopeGridLocal[r][c] = dir;
                     }
                 }
             }
 
-            // 2️⃣ Gradoni paralleli
-            const numPatches = 1 + Math.floor(Math.random() * 3); // 3–5 gradoni
-
+            // --- Gradoni paralleli (resta identico) ---
+            const numPatches = 1 + Math.floor(Math.random() * 3);
             for (let p = 0; p < numPatches; p++) {
                 const centerR = offsetR + Math.floor(Math.random() * greenZoomRows);
                 const centerC = offsetC + Math.floor(Math.random() * greenZoomCols);
 
-                const height = 1 + Math.floor(Math.random() * 2); // altezza 1-2 tile
-                const width = 6 + Math.floor(Math.random() * 3);  // larghezza 3-5 tile
-
+                const height = 1 + Math.floor(Math.random() * 2);
+                const width = 6 + Math.floor(Math.random() * 3);
                 const horizontal = Math.random() < 0.5;
                 const arrow = horizontal ? (Math.random() < 0.5 ? "LEFT" : "RIGHT") : (Math.random() < 0.5 ? "UP" : "DOWN");
 
                 for (let r = Math.max(0, centerR - Math.floor(height)); r <= Math.min(zoomSize - 1, centerR + Math.floor(height / 2)); r++) {
-                    for (let c = Math.max(0, centerC - Math.floor(width * 2)); c <= Math.min(zoomSize - 1, centerC + Math.floor(width / 2)); c++) {
+                    for (let c = Math.max(0, centerC - Math.floor(width / 2)); c <= Math.min(zoomSize - 1, centerC + Math.floor(width / 2)); c++) {
                         if (zoomGrid[r][c] !== TILE.GREEN) continue;
                         slopeGridLocal[r][c] = arrow;
                     }
                 }
             }
 
-            // --- Posizione pallina proporzionale ---
+            // --- Posizione iniziale pallina sul grid zoom ---
             const ballRelRow = ball.row - minR;
             const ballRelCol = ball.col - minC;
-            ball.rowZoom = offsetR + Math.floor(ballRelRow * greenZoomRows / greenRows);
-            ball.colZoom = offsetC + Math.floor(ballRelCol * greenZoomCols / greenCols);
+
+            // La pallina parte centrata sul green o vicino al tee
+            ball.rowZoom = offsetR + Math.floor(ballRelRow * scale);
+            ball.colZoom = offsetC + Math.floor(ballRelCol * scale);
 
             return { zoomGrid, slopeGrid: slopeGridLocal };
         }
-
         function fillTile(x, y, w, h, color) {
             ctx.fillStyle = color;
             ctx.fillRect(Math.round(x + 0.5), Math.round(y + 0.5), Math.round(w - 1), Math.round(h - 1));
@@ -663,24 +685,29 @@
 
             switch (startTile) {
                 case TILE.ROUGH:
-                        if (selectedSpecial && selectedSpecial.name === 'Rough shot') {
-                            // Rough shot: nessun malus
-                            distanceFactor = 1;
-                            rollFactor = 1;
+                    if (selectedSpecial && selectedSpecial.name === 'Rough shot') {
+                        // Rough shot: nessun malus
+                        distanceFactor = 0.9;
+                        rollFactor = 0.9;
+                    } else {
+                        if (selectedClub.id === 'driver' || selectedClub.id === 'wood') {
+                            distanceFactor = 0.5;
+                            rollFactor = 0.5;
                         } else {
-                            if (selectedClub.id === 'driver' || selectedClub.id === 'wood') {
-                                distanceFactor = 0.5;
-                                rollFactor = 0.5;
+                            if (selectedClub.id === 'pitch' || selectedClub.id === 'sand' || selectedClub.id === 'wedge') {
+                                distanceFactor = 0.9;
+                                rollFactor = 0.9;
                             } else {
-                                if (selectedClub.id === 'pitch' || selectedClub.id === 'sand' || selectedClub.id === 'wedge') {
-                                    distanceFactor = 0.9;
-                                    rollFactor = 0.9;
+                                if (selectedClub.id === 'putt' || selectedClub.id === 'sand' || selectedClub.id === 'wedge') {
+                                    distanceFactor = 0;
+                                    rollFactor = 1;
                                 } else {
                                     distanceFactor = 0.75;
                                     rollFactor = 0.75;
                                 }
                             }
                         }
+                    }
                     break;
                 case TILE.BUNKER:
                     if (selectedSpecial && selectedSpecial.name === 'Sand shot') {
@@ -688,7 +715,7 @@
                         distanceFactor = 1;
                         rollFactor = 1;
                     } else {
-                        if (selectedClub.name === 'sand') {
+                        if (selectedClub.name === 'Sand' || selectedClub.name ==='Putt') {
                             distanceFactor = 1;
                             rollFactor = 1;
                         } else {
@@ -728,8 +755,6 @@
             executeShotAnimatedDelta(Math.round(deltaCol), Math.round(deltaRow), rollDistance, shotObj.curve);
         }
 
-        // costruisce la traiettoria discreta tra posizione corrente e posizione target (deltaCol, deltaRow)
-        // e la anima; interrompe su acqua
         function executeShotAnimatedDelta(deltaCol, deltaRow, rollDistance, curve = 0) {
             strokes++;
             if (strokesEl) strokesEl.innerText = strokes;
@@ -740,31 +765,24 @@
             const flightTargetRow = clamp(startRow + deltaRow, 0, ROWS_TOTAL - 1);
 
             const steps = Math.max(Math.abs(flightTargetCol - startCol), Math.abs(flightTargetRow - startRow), 1);
-            const path = [];
-            // delta per step
-            let stepDeltaCol = (flightTargetCol - startCol) / steps;
-            let stepDeltaRow = (flightTargetRow - startRow) / steps;
 
-            for (let s = 1; s <= steps; s++) {
-                const c = clamp(Math.round(startCol + stepDeltaCol * s), 0, COLS - 1);
-                const r = clamp(Math.round(startRow + stepDeltaRow * s), 0, ROWS_TOTAL - 1);
-                path.push({ c, r });
-            }
+            // Variabili float per posizione volo
+            let floatCol = ball.col;
+            let floatRow = ball.row;
+            const curveScale = 0.05;
+            const curveDeltaPerStep = curve * curveScale;
 
             let i = 0;
             const fpsInterval = 1000 / 40;
             let lastTime = performance.now();
-            // Inizio volo: usa variabili float per la posizione
-            let floatCol = ball.col;
-            let floatRow = ball.row;
-            const curveScale = 0.05;
-            const curveDeltaPerStep = curve * curveScale; // spostamento laterale per step dovuto alla curva
+
             function step(now) {
                 if (i < steps) {
                     if (now - lastTime >= fpsInterval) {
                         const stepDeltaCol = (flightTargetCol - startCol) / steps;
                         const stepDeltaRow = (flightTargetRow - startRow) / steps;
 
+                        // vento
                         let windDeltaCol = 0;
                         let windDeltaRow = 0;
                         if (wind && wind.intensity > 0) {
@@ -772,15 +790,16 @@
                             windDeltaCol = Math.cos(wind.direction) * wind.intensity * windScale;
                             windDeltaRow = Math.sin(wind.direction) * wind.intensity * windScale;
                         }
+
                         const curveDeltaCol = curveDeltaPerStep;
-                        // Aggiorna posizione float
+
+                        // aggiorna float
                         floatCol += stepDeltaCol + windDeltaCol + curveDeltaCol;
                         floatRow += stepDeltaRow + windDeltaRow;
 
-                        // Solo per il render, arrotonda temporaneamente
+                        // render temporaneo
                         ball.col = clamp(Math.round(floatCol), 0, COLS - 1);
                         ball.row = clamp(Math.round(floatRow), 0, ROWS_TOTAL - 1);
-
                         viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
                         render();
 
@@ -789,11 +808,11 @@
                     }
                     requestAnimationFrame(step);
                 } else {
-                    // Atterraggio: determina la tile finale
+                    // volo finito
                     ball.col = clamp(Math.round(floatCol), 0, COLS - 1);
                     ball.row = clamp(Math.round(floatRow), 0, ROWS_TOTAL - 1);
-                    const landedTile = mapGrid[ball.row][ball.col];
 
+                    const landedTile = mapGrid[ball.row][ball.col];
                     if (landedTile === TILE.WATER) {
                         ball.col = startCol;
                         ball.row = startRow;
@@ -802,108 +821,111 @@
                         alert("Palla atterrata in acqua! Ritenta il colpo.");
                         return;
                     }
-                    // --- Mostra cerchio rosso sulla tile di atterraggio ---
+
+                    // Mostra cerchio rosso sull'atterraggio
                     const rect = canvas.getBoundingClientRect();
-                    const cssW = rect.width;
-                    const tileSize = cssW / VIEW_COLS;
+                    const tileSize = rect.width / VIEW_COLS;
                     const x = (ball.col + 0.5) * tileSize;
                     const y = (ball.row - viewRowStart + 0.5) * tileSize;
-
                     ctx.save();
                     ctx.beginPath();
                     ctx.arc(x, y, tileSize * 0.25, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(255,0,0,0.6)';
                     ctx.fill();
                     ctx.restore();
-                    // --- Disegna freccia roll extra se presente ---
-                    if (rollDistance > 0) {
-                        const angle = Math.atan2(deltaRow, deltaCol);
-                        ctx.save();
-                        ctx.strokeStyle = selectedSpecial && selectedSpecial.id === 'topspin' ? 'orange' :
-                            selectedSpecial && selectedSpecial.id === 'backspin' ? 'blue' : 'gray';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
 
-                        // direzione roll = stessa del colpo
-                        const arrowLen = tileSize * 0.6 + rollDistance * 2;
-                        const arrowX = x + Math.cos(angle) * arrowLen;
-                        const arrowY = y + Math.sin(angle) * arrowLen;
-
-
-                        ctx.moveTo(x, y);
-                        ctx.lineTo(arrowX, arrowY);
-                        ctx.stroke();
-
-                        // punta freccia
-                        ctx.beginPath();
-                        ctx.moveTo(arrowX, arrowY);
-                        ctx.lineTo(arrowX - Math.cos(angle - 0.3) * 10, arrowY - Math.sin(angle - 0.3) * 10);
-                        ctx.lineTo(arrowX - Math.cos(angle + 0.3) * 10, arrowY - Math.sin(angle + 0.3) * 10);
-                        ctx.closePath();
-                        ctx.fillStyle = ctx.strokeStyle;
-                        ctx.fill();
-
-                        ctx.restore();
-                    }
-
-                    // --- Rotolo ---
+                    // Calcola rotolo
                     let rollDistanceAdjusted = rollDistance;
                     if (landedTile === TILE.GREEN) rollDistanceAdjusted *= 1.5;
                     else if (landedTile === TILE.ROUGH) rollDistanceAdjusted *= 0.5;
                     else if (landedTile === TILE.BUNKER) rollDistanceAdjusted = 1;
-                    else if (landedTile === TILE.FAIRWAY) rollDistanceAdjusted = rollDistance;
 
                     const angle = Math.atan2(deltaRow, deltaCol);
                     const rollCol = Math.round(Math.cos(angle) * rollDistanceAdjusted);
                     const rollRow = Math.round(Math.sin(angle) * rollDistanceAdjusted);
-                    const rollSteps = Math.max(Math.abs(rollCol), Math.abs(rollRow), 1);
-                    let j = 0;
 
-                    function rollStep() {
-                        if (j < rollSteps) {
-                            const t = (j + 1) / rollSteps;
-                            ball.col = clamp(Math.round(ball.col + rollCol * t / rollSteps), 0, COLS - 1);
-                            ball.row = clamp(Math.round(ball.row + rollRow * t / rollSteps), 0, ROWS_TOTAL - 1);
-                            viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
-                            render();
-                            j++;
-                            requestAnimationFrame(rollStep);
-                        } else {
-                            ball.col = clamp(ball.col, 0, COLS - 1);
-                            ball.row = clamp(ball.row, 0, ROWS_TOTAL - 1);
-                            if (mapGrid[ball.row][ball.col] === TILE.WATER) {
-                                ball.col = startCol;
-                                ball.row = startRow;
-                                viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
-                                render();
-                                alert("Palla in acqua durante il rotolo! Ritenta il colpo.");
-                                return;
-                            }
-
-                            if (mapGrid[ball.row][ball.col] === TILE.GREEN) {
-                                const area = getGreenArea();
-                                if (area) {
-                                    setTimeout(() => {
+                    // Log dettagliato volo e rotolo (decimali inclusi)
+                    console.log(
+                        `Volo deltaCol: ${deltaCol}, deltaRow: ${deltaRow}, ` +
+                        `Rotolo calcolato rollCol: ${rollCol.toFixed(2)}, rollRow: ${rollRow.toFixed(2)}, ` +
+                        `rollDistanceAdjusted: ${rollDistanceAdjusted.toFixed(2)}`
+                    );
+                    // Avvia rollBall
+                    if (rollCol !== 0 || rollRow !== 0) {
+                        setTimeout(() => {
+                            rollBall(rollCol, rollRow, () => {
+                                updateDistances();
+                                if (mapGrid[ball.row][ball.col] === TILE.GREEN) {
+                                    const area = getGreenArea();
+                                    if (area) {
                                         const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(area.minR, area.maxR, area.minC, area.maxC);
                                         currentGrid = zoomGrid;
                                         slopeGrid = slopes;
-                                        puttMode = true; // abilita modalità putt
-                                        render();        // renderizza zoom
-                                    }, 500);
+                                        puttMode = true;
+                                        render();
+                                    }
                                 }
+                            });
+                        }, 300); // pausa breve
+                    } else {
+                        // nessun rotolo, controllo diretto buca
+                        if (mapGrid[ball.row][ball.col] === TILE.GREEN) {
+                            const area = getGreenArea();
+                            if (area) {
+                                const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(area.minR, area.maxR, area.minC, area.maxC);
+                                currentGrid = zoomGrid;
+                                slopeGrid = slopes;
+                                puttMode = true;
+                                render();
                             }
-                            updateDistances();
-                            checkHole(); // controlla se pallina è nella buca
                         }
+                        updateDistances();
+                        checkHole();
                     }
-
-                    setTimeout(() => rollStep(), 200); // pausa breve per vedere il cerchio
                 }
             }
-
             requestAnimationFrame(step);
         }
 
+        function checkHole() {
+            if (puttMode) {
+                // Solo se esattamente sulla tile centrale del buco
+                if (ball.rowZoom === hole.rowZoom && ball.colZoom === hole.colZoom) {
+                    handleHole();
+                    return true;
+                }
+
+            } else {
+                // modalità normale
+                if (ball.row === hole.row && ball.col === hole.col) {
+                    handleHole();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function handleHole() {
+            holes[currentHoleIndex].strokes = strokes; // aggiorna colpi
+            setTimeout(() => {
+                if (selectedMode === 'adventure') finishAdventureHole();
+                else {
+                    finishHole();
+                }
+                puttMode = false;
+                currentGrid = null;
+                slopeGrid = null;
+                ball.rowZoom = null;
+                ball.colZoom = null;
+                const teePos = findTeePosition();
+                ball.row = teePos.row;
+                ball.col = teePos.col;
+                viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
+                render();
+            }, 60);
+        }
+
+        // --- Putt della pallina sul green zoomato ---
         function puttShot(targetColZoom, targetRowZoom) {
             strokes++;
             if (strokesEl) strokesEl.innerText = strokes;
@@ -917,9 +939,8 @@
             const steps = Math.max(Math.abs(deltaCol), Math.abs(deltaRow), 1) * 6;
             let i = 0;
 
-            // direzione "base" verso il target
-            let velCol = deltaCol / steps;
-            let velRow = deltaRow / steps;
+            const velCol = deltaCol / steps;
+            const velRow = deltaRow / steps;
 
             function step() {
                 if (i < steps) {
@@ -929,21 +950,20 @@
                     const r = Math.round(posRow);
                     const c = Math.round(posCol);
 
-                    // --- influenza frecce ---
+                    // Slope influenza
                     if (slopeGrid && slopeGrid[r] && slopeGrid[r][c]) {
                         const dir = slopeGrid[r][c];
-                        const influence = 0.075; // deviazione moderata
-
+                        const influence = 0.075;
                         switch (dir) {
-                            case 'UP': posRow -= influence; break;
-                            case 'DOWN': posRow += influence; break;
-                            case 'LEFT': posCol -= influence; break;
-                            case 'RIGHT': posCol += influence; break;
+                            case "UP": posRow -= influence; break;
+                            case "DOWN": posRow += influence; break;
+                            case "LEFT": posCol -= influence; break;
+                            case "RIGHT": posCol += influence; break;
                         }
                     }
-                    ball.colZoom = Math.round(posCol);
-                    ball.rowZoom = Math.round(posRow);
 
+                    ball.rowZoom = Math.round(posRow);
+                    ball.colZoom = Math.round(posCol);
                     render();
                     i++;
                     setTimeout(() => requestAnimationFrame(step), 30);
@@ -951,10 +971,12 @@
                     // Conversione finale in coordinate globali
                     const greenArea = getGreenArea();
                     if (!greenArea) return;
-                    
+
                     const scale = 3;
                     const offsetR = Math.floor((currentGrid.length - (greenArea.maxR - greenArea.minR + 1) * scale) / 2);
                     const offsetC = Math.floor((currentGrid[0].length - (greenArea.maxC - greenArea.minC + 1) * scale) / 2);
+
+                    // Qui assicuriamo che la buca sia solo la tile centrale
                     const ballGlobalCol = greenArea.minC + Math.round((ball.colZoom - offsetC) / scale);
                     const ballGlobalRow = greenArea.minR + Math.round((ball.rowZoom - offsetR) / scale);
 
@@ -962,41 +984,38 @@
                     ball.row = ballGlobalRow;
                     render();
 
-                    // **qui controllo buca**
+                    // Controlla se la pallina è entrata nella buca perfetta
                     checkHole();
-
                 }
             }
 
             requestAnimationFrame(step);
         }
+        function rollBall(rollCol, rollRow, callback) {
+            const rollSteps = Math.max(Math.abs(rollCol), Math.abs(rollRow), 1);
+            let j = 0;
 
-        function checkHole() {
-            if (ball.row === hole.row && ball.col === hole.col) {
-                holes[currentHoleIndex].strokes = strokes; // aggiorna colpi della buca corrente
+            function rollStep() {
+                if (j < rollSteps) {
+                    const t = (j + 1) / rollSteps;
+                    ball.col = clamp(Math.round(ball.col + rollCol * t / rollSteps), 0, COLS - 1);
+                    ball.row = clamp(Math.round(ball.row + rollRow * t / rollSteps), 0, ROWS_TOTAL - 1);
 
-                setTimeout(() => {
-                    alert(`Hole! Hai finito in ${strokes} colpi.`);
-                    finishHole();
-
-                    // reset palla e zoom
-                    puttMode = false;
-                    currentGrid = null;
-                    slopeGrid = null;
-                    ball.rowZoom = null;
-                    ball.colZoom = null;
-                    zoomedOut = false;
-
-                    const teePos = findTeePosition();
-                    ball.row = teePos.row;
-                    ball.col = teePos.col;
                     viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
                     render();
-                }, 60);
+                    j++;
+                    requestAnimationFrame(rollStep);
+                } else {
+                    // Fine rotolo
+                    if (mapGrid[ball.row][ball.col] === TILE.HOLE) {
+                        checkHole();
+                    }
 
-                return true;
+                    if (callback) callback();
+                }
             }
-            return false;
+
+            rollStep();
         }
 
         function findTeePosition() {
@@ -1009,30 +1028,28 @@
         }
 
         // UI: popola mazzi
-        function populateDecks() {
+        window.populateDecks = function() {
             if (clubsDeckEl) {
                 clubsDeckEl.innerHTML = '';
 
-                // Ordina le carte per il campo 'order'
-                const sortedClubs = [...Clubs].sort((a, b) => a.num - b.num);
+                // Usa solo le mazze che il giocatore ha
+                const sortedClubs = [...playerClubs].sort((a, b) => (a.num || 0) - (b.num || 0));
 
                 sortedClubs.forEach((c, idx) => {
                     const el = document.createElement('div');
                     el.classList.add('card');
                     el.tabIndex = 0;
 
-                    // aggiungi classi colore in base al tipo
                     if (c.id === 'driver') el.classList.add('driver');
                     else if (c.id.startsWith('wood')) el.classList.add('wood');
                     else if (c.id.startsWith('iron')) el.classList.add('iron');
                     else if (['wedge', 'sand', 'pitch'].includes(c.id)) el.classList.add(c.id);
 
-                    // emoji e info: distanza ⛳, roll ↘, precisione 🎯
                     el.innerHTML = `
-            <div class="title">${c.name}</div>
-            <div class="sub">⛳ ${c.distance} | ↘ ${c.roll} | 🎯 ${(c.accuracy * 100).toFixed(0)}%</div>
-            <div class="desc">📝 ${c.desc}</div>
-        `;
+    <div class="title">${c.name}</div>
+    <div class="sub">⛳ ${c.distance || c.power} | ↘ ${c.roll || '-'} | 🎯 ${(c.accuracy ? c.accuracy * 100 : 0).toFixed(0)}%</div>
+    <div class="desc">📝 ${c.desc || ''}</div>
+`;
 
                     el.addEventListener('click', () => {
                         selectedClub = c;
@@ -1049,16 +1066,15 @@
 
             if (specialDeckEl) {
                 specialDeckEl.innerHTML = '';
-                Specials.forEach((s) => {
+                playerSpecials.forEach((s) => {
                     const el = document.createElement('div');
                     el.className = 'card';
                     el.tabIndex = 0;
 
-                    // emoji per rendere più chiaro il tipo di special
                     el.innerHTML = `
-                <div class="title">${s.name}</div>
-                <div class="sub">✨ ${s.desc}</div>
-            `;
+        <div class="title">${s.name}</div>
+        <div class="sub">✨ ${s.desc}</div>
+    `;
 
                     el.addEventListener('click', () => {
                         selectedSpecial = s;
@@ -1070,6 +1086,7 @@
                 });
             }
         }
+
 
         const camUpBtn = document.getElementById('camUpBtn');
         const camDownBtn = document.getElementById('camDownBtn');

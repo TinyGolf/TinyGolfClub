@@ -7,6 +7,21 @@
     <link rel="stylesheet" href="golfclub.css">
 </head>
 <body>
+    <!-- Menu principale (inserisci subito dentro <body> ma fuori <main>) -->
+    <div id="mainMenu" class="menu-overlay">
+        <div class="menu-content">
+            <button id="rulesBtn" class="menu-btn">📜 Regole</button>
+
+            <h3>Numero di buche</h3>
+            <button class="menu-btn" data-holes="9">9 Buche</button>
+            <button class="menu-btn" data-holes="18">18 Buche</button>
+
+            <h3>Modalità di gioco</h3>
+            <button class="menu-btn" data-mode="classic">Classica</button>
+            <button class="menu-btn" data-mode="adventure">Avventura</button>
+        </div>
+    </div>
+
     <main class="app">
         <!-- Header / scoreboard -->
         <header class="topbar">
