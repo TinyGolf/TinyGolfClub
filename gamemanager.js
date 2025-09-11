@@ -374,7 +374,7 @@ function startAdventure() {
 
     const initialClubs = [
         getRandomClub(2, 4),    // legno casuale
-        getRandomClub(5, 12),   // ferro casuale
+        getRandomClub(7, 11),   // ferro casuale
         getRandomClub(13, 15),  // bastone casuale tra sand, pitch, wedge
         Clubs.find(c => c.num === 16) // putter fisso
     ];
@@ -488,9 +488,15 @@ function finishAdventureHole() {
     } else if (diff >= 3) {
         holePoints.details.push({ reason: "Albatross", points: 500 });
         holePoints.total += 500;
-    } else if (strokes === 1) {
-        holePoints.details.push({ reason: "Hole in one", points: 1000 });
-        holePoints.total += 1000;
+    } else if (diff === -1) {
+        holePoints.details.push({ reason: "Bogey", points: 25 });
+        holePoints.total += 25;
+    } else if (diff === -2) {
+        holePoints.details.push({ reason: "Doppio Bogey", points: 15 });
+        holePoints.total += 15;
+    } else if (diff <= -3) {
+        holePoints.details.push({ reason: "Triplo Bogey", points: 5 });
+        holePoints.total += 5;
     }
 
     // --- Calcolo monete ---
@@ -539,9 +545,9 @@ holePoints.details.push({ reason: `Monete guadagnate`, points: coinsEarned });
 
         // Mappa difficoltà → premi base
         const rewards = {
-            1: { par: 3, birdie: 5, eagle: 8, albatross: 15, holeInOne: 30 },
-            2: { par: 6, birdie: 10, eagle: 15, albatross: 23, holeInOne: 40 },
-            3: { par: 10, birdie: 15, eagle: 25, albatross: 30, holeInOne: 55 }
+            1: { subPar:1, par: 3, birdie: 5, eagle: 8, albatross: 15, holeInOne: 30 },
+            2: { subPar: 3, par: 6, birdie: 10, eagle: 15, albatross: 23, holeInOne: 40 },
+            3: { subPar: 5, par: 10, birdie: 15, eagle: 25, albatross: 30, holeInOne: 55 }
         };
 
         const r = rewards[difficulty] || rewards[1]; // default se difficoltà sconosciuta
@@ -551,7 +557,7 @@ holePoints.details.push({ reason: `Monete guadagnate`, points: coinsEarned });
         else if (diff === 2) coins = r.eagle;   // Eagle
         else if (diff === 1) coins = r.birdie;  // Birdie
         else if (diff === 0) coins = r.par;     // Par
-        else if (diff < 0) coins = Math.max(0, r.par + diff); // sopra par, riduci premi ma minimo 0
+        else if (diff < 0) coins =r.subPar; // sopra par, riduci premi ma minimo 0
 
         return coins;
     }
