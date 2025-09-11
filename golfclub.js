@@ -891,14 +891,33 @@
             if (puttMode) {
                 // Solo se esattamente sulla tile centrale del buco
                 if (ball.rowZoom === hole.rowZoom && ball.colZoom === hole.colZoom) {
-                    handleHole();
+                    setTimeout(() => {
+                        handleHole();
+                    }, 500);
                     return true;
                 }
 
             } else {
                 // modalità normale
                 if (ball.row === hole.row && ball.col === hole.col) {
-                    handleHole();
+                    if (Math.random() < 0.5) {
+                        // 50% probabilità di completare la buca subito
+                        setTimeout(() => {
+                            handleHole();
+                        }, 500);
+                    } else {
+                        // Altrimenti entra in modalità putt/zoom sul green
+                            const area = getGreenArea();
+                            if (area) {
+                                const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(
+                                    area.minR, area.maxR, area.minC, area.maxC
+                                );
+                                currentGrid = zoomGrid;
+                                slopeGrid = slopes;
+                                puttMode = true;
+                                render();
+                            }
+                    }
                     return true;
                 }
             }
@@ -1090,7 +1109,7 @@
 
         const camUpBtn = document.getElementById('camUpBtn');
         const camDownBtn = document.getElementById('camDownBtn');
-        const STEP = 5; // step per spostamento telecamera
+        const STEP = 10; // step per spostamento telecamera
 
         if (camUpBtn) {
             camUpBtn.addEventListener('click', () => {
