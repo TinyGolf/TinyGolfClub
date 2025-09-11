@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <title>Mini Golf - Card Game</title>
+    <title>TinyGolf - CardGame</title>
     <link rel="stylesheet" href="golfclub.css">
 </head>
 <body>
@@ -21,6 +21,43 @@
             <button class="menu-btn" data-mode="adventure">Avventura</button>
         </div>
     </div>
+
+    <!-- Rules Overlay -->
+    <div id="rulesMenu" class="menu-overlay" style="display:none;">
+        <div class="menu-content">
+            <h2>📜 Regole del Gioco</h2>
+            <p>
+                Benvenuto in <strong>Tiny Golf!</strong><br>
+                L'obiettivo del gioco è imbucare la pallina in <b>meno tentativi possibili</b>.
+            </p>
+
+            <h3>Modalità di gioco</h3>
+            <ul>
+                <li><strong>Classica:</strong> avrai tutto sbloccato fin dall'inizio.</li>
+                <li><strong>Avventura:</strong> dovrai comprare le mazze e i colpi speciali.</li>
+            </ul>
+
+            <h3>Mazze e colpi</h3>
+            <ul>
+                <li><span style="color: #8b5a2b;"><b>Drive e Legni</b></span>: molto efficaci dal <i>Tee</i>, ma con malus se tirati da altre posizioni.</li>
+                <li><span style="color: #c0c0c0;"><b>Ferri</b></span>: abbastanza universali, senza malus particolari.</li>
+                <li><span style="color: #32bbed;"><b>Pitch, Sand e Wedge</b></span>: meno malus sul <i>rough</i>; il <b>Sand</b> non ha malus dalla sabbia.</li>
+                <li><span style="color: #1f1f1f;"><b>Putt</b></span>: ideale per tiri di avvicinamento; i colpi speciali influenzano quanto la pallina rotola.</li>
+            </ul>
+
+            <h3>Tipi di terreno</h3>
+            <ul>
+                <li><span style="color: #77b255;"><b>Fairway</b></span>: pista principale, da puntare sempre.</li>
+                <li><span style="color: #5a7a3a;"><b>Rough</b></span>: colpi con malus su potenza e rotolamento.</li>
+                <li><span style="color: #e6d6aa;"><b>Bunker</b></span>: colpo e rotolamento dimezzati.</li>
+                <li><span style="color: #5ec1ff;"><b>Acqua</b></span>: pallina persa, si ritorna al tiro precedente.</li>
+                <li><span style="color: #9be36b;"><b>Green</b></span>: obiettivo finale; rotolamento maggiore.</li>
+            </ul>
+
+            <button id="backToMenuBtn" class="menu-btn">⬅ Indietro</button>
+        </div>
+    </div>
+
 
     <main class="app">
         <!-- Header / scoreboard -->

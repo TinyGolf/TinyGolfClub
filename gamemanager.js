@@ -1,70 +1,142 @@
-//gamemanager.js
+// --- Riferimenti principali ---
 const mainMenu = document.getElementById('mainMenu');
+const rulesMenu = document.getElementById('rulesMenu');
+const backToMenuBtn = document.getElementById('backToMenuBtn');
+
 let selectedHoles = null;
 let selectedMode = null;
-// All’inizio del file
+
+// Stato torneo globale
 let playerClubs = [];
 let playerSpecials = [];
-let playerScore = 0;
-let playerCoins = 0;
-let currentHolePoints = []; // punti della buca corrente
+let currentHoleIndex = 0;
+let totalHoles = 9;
+let holes = [];
+let strokes = 0;
+let holePointsLog = [];
 
-
-// Mostra regole
+// --- Pulsante "Regole" ---
 document.getElementById('rulesBtn').addEventListener('click', () => {
-    alert("Regole del gioco: ... qui puoi mettere le istruzioni");
+    mainMenu.style.display = 'none';
+    rulesMenu.style.display = 'flex';
 });
 
-// Selezione numero di buche
+// --- Torna al menu principale ---
+backToMenuBtn.addEventListener('click', () => {
+    rulesMenu.style.display = 'none';
+    mainMenu.style.display = 'flex';
+
+    // Resetta solo lo stato dei pulsanti, non il torneo
+    mainMenu.querySelectorAll('[data-holes]').forEach(btn => btn.style.background = '');
+    mainMenu.querySelectorAll('[data-mode]').forEach(btn => btn.style.background = '');
+    selectedHoles = null;
+    selectedMode = null;
+});
+
+// --- Selezione numero di buche ---
 mainMenu.querySelectorAll('[data-holes]').forEach(btn => {
     btn.addEventListener('click', () => {
         selectedHoles = parseInt(btn.dataset.holes, 10);
-        mainMenu.dataset.holes = selectedHoles; // ← qui
+        mainMenu.dataset.holes = selectedHoles;
+        mainMenu.querySelectorAll('[data-holes]').forEach(b => b.style.background = '');
         btn.style.background = '#28a745';
         checkStart();
     });
 });
 
-// Selezione modalità
+// --- Selezione modalità ---
 mainMenu.querySelectorAll('[data-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
         selectedMode = btn.dataset.mode;
+        mainMenu.querySelectorAll('[data-mode]').forEach(b => b.style.background = '');
         btn.style.background = '#28a745';
         checkStart();
     });
 });
 
-// Avvia gioco quando entrambe le scelte sono fatte
+function showMessage(message, callback) {
+    // Rimuovi eventuale finestra precedente
+    const old = document.querySelector('.custom-alert');
+    if (old) old.remove();
+
+    // Contenitore overlay
+    const overlay = document.createElement('div');
+    overlay.classList.add('menu-overlay', 'custom-alert'); // riusa lo stile overlay
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+
+    // Finestra
+    const box = document.createElement('div');
+    box.style.background = '#fff';
+    box.style.padding = '1.5rem';
+    box.style.borderRadius = '12px';
+    box.style.textAlign = 'center';
+    box.style.maxWidth = '300px';
+    box.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+
+    // Messaggio
+    const text = document.createElement('p');
+    text.innerText = message;
+    text.style.marginBottom = '1rem';
+    box.appendChild(text);
+
+    // Pulsante OK
+    const okBtn = document.createElement('button');
+    okBtn.innerText = 'OK';
+    okBtn.classList.add('menu-btn');
+    okBtn.addEventListener('click', () => {
+        overlay.remove();
+        if (callback) callback();
+    });
+    box.appendChild(okBtn);
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
+function resetGameState() {
+    // Stato torneo classico
+    holes = [];
+    currentHoleIndex = 0;
+    totalHoles = 9;
+    strokes = 0;
+
+    // Stato avventura
+    adventureHoles = [];
+    currentHoleIndexAdventure = 0;
+    totalHolesAdventure = 0;
+    holePointsLog = [];
+    playerClubs = [];
+    playerSpecials = [];
+    playerScore = 0;
+    playerCoins = 0;
+
+    // Stato di gioco generale
+    puttMode = false;
+    currentGrid = null;
+    slopeGrid = null;
+    viewRowStart = 0;
+    ball = { row: 0, col: 0 };
+}
+
+// --- Avvia gioco solo se entrambe le scelte sono fatte ---
+// --- Avvia gioco quando entrambe le scelte sono fatte ---
 function checkStart() {
     if (selectedHoles && selectedMode) {
         mainMenu.style.display = 'none';
+
         if (selectedMode === 'adventure') {
-            startAdventure(); // la tua funzione avventura
+            startAdventure();   // fai partire la modalità avventura
         } else {
-            startTournament(selectedHoles, selectedMode); // classica
+            startTournament(selectedHoles, selectedMode); // modalità torneo classica
         }
     }
 }
 
-// Funzione stub per partire con il gioco
-function startGame(holes, mode) {
-    console.log("Inizio partita:", holes, "buche,", "modalità", mode);
-    // Qui puoi inizializzare mappe, palla, ecc.
-}
-// Impostazioni torneo
-let totalHoles = 9; // o 18
-let currentHoleIndex = 0;
-// Array di oggetti buca: { par: 3|4|5, difficulty: 1|2|3, strokes: 0 }
-let holes = [];
-let strokes = 0; // colpi della buca corrente
-
-// Score globale
-let scores = [];
-
+// --- Inizializza torneo ---
 function startTournament(numHoles, mode) {
     console.log("Avvio torneo:", numHoles, "buche, modalità:", mode);
 
-    // Mazze: tutte
     playerClubs = [...Clubs];
     playerSpecials = [...Specials];
     populateDecks();
@@ -72,7 +144,6 @@ function startTournament(numHoles, mode) {
     totalHoles = numHoles;
     currentHoleIndex = 0;
     holes = [];
-    scores = [];
 
     for (let i = 0; i < totalHoles; i++) {
         const rand = Math.random();
@@ -84,18 +155,24 @@ function startTournament(numHoles, mode) {
     startHole(currentHoleIndex);
 }
 
+// --- Avvia singola buca ---
 function startHole(index) {
-    playerClubs = [...Clubs];
     const hole = holes[index];
     if (!hole) {
         console.warn("startHole chiamata ma hole undefined!", index, holes);
-        return; // evita crash
+        return;
     }
 
-    document.getElementById('holeNumber').innerText = index + 1;
+    console.log("Inizio buca", index + 1);
 
+    currentHoleIndex = index;
     strokes = 0;
     hole.strokes = 0;
+
+    const holeNumberEl = document.getElementById('holeNumber');
+    if (holeNumberEl) holeNumberEl.innerText = index + 1;
+
+    const strokesEl = document.getElementById('strokes');
     if (strokesEl) strokesEl.innerText = strokes;
 
     generateMap(hole.par, hole.difficulty);
@@ -104,22 +181,23 @@ function startHole(index) {
     render();
 }
 
+// --- Termina buca e mostra scoreboard ---
 function finishHole() {
     showScoreboard();
 }
 
+// --- Mostra scoreboard (incluso pulsante Prossima buca) ---
 function showScoreboard() {
-    console.log("Mostra scoreboard");
     const old = document.querySelector('.scoreboard');
     if (old) old.remove();
 
     const container = document.createElement('div');
     container.classList.add('scoreboard');
 
-    // --- Riga informativa buca appena finita ---
     const currentHole = holes[currentHoleIndex];
     const diff = currentHole.strokes - currentHole.par;
     let resultText = '';
+
     if (currentHole.strokes === 1) resultText = 'Hole in One';
     else if (diff <= -3) resultText = 'Albatross';
     else if (diff === -2) resultText = 'Eagle';
@@ -129,16 +207,30 @@ function showScoreboard() {
     else if (diff === 2) resultText = 'Doppio Bogey';
     else if (diff >= 3) resultText = 'Triplo Bogey';
 
+    const resultStyle = {
+        'Hole in One': { color: '#ffd700', fontSize: '1.5rem', fontWeight: 'bold' },
+        'Albatross': { color: '#8a2be2', fontSize: '1.4rem', fontWeight: 'bold' },
+        'Eagle': { color: '#1e90ff', fontSize: '1.3rem', fontWeight: 'bold' },
+        'Birdie': { color: '#00bfff', fontSize: '1.2rem', fontWeight: 'bold' },
+        'Par': { color: '#7cfc00', fontSize: '1rem', fontWeight: 'bold' },
+        'Bogey': { color: '#ffff00', fontSize: '1rem', fontWeight: 'bold' },
+        'Doppio Bogey': { color: '#ff8c00', fontSize: '1rem', fontWeight: 'bold' },
+        'Triplo Bogey': { color: '#ff0000', fontSize: '1rem', fontWeight: 'bold' }
+    };
+
+    const style = resultStyle[resultText] || { color: '#000', fontSize: '1rem' };
     const infoRow = document.createElement('div');
     infoRow.classList.add('score-info');
     infoRow.innerText = `Buca ${currentHoleIndex + 1}: ${resultText}`;
+    infoRow.style.color = style.color;
+    infoRow.style.fontSize = style.fontSize;
+    infoRow.style.fontWeight = style.fontWeight;
+    infoRow.style.marginBottom = '0.5rem';
     container.appendChild(infoRow);
 
-    // Front 9 e Back 9
+    // Mostra Front e Back 9
     const frontHoles = holes.slice(0, 9);
     const backHoles = holes.length > 9 ? holes.slice(9, 18) : [];
-
-    // Funzione per creare righe di score
     function createScoreRows(holesSubset) {
         const headerRow = document.createElement('div');
         headerRow.classList.add('score-row');
@@ -180,25 +272,17 @@ function showScoreboard() {
         return [headerRow, parRow, scoreRow];
     }
 
-    // --- Mostra Front 9 sempre ---
     createScoreRows(frontHoles).forEach(el => container.appendChild(el));
+    if (backHoles.length > 0) createScoreRows(backHoles).forEach(el => container.appendChild(el));
 
-    // --- Mostra Back 9 solo se esistono buche aggiuntive ---
-    if (backHoles.length > 0) {
-        createScoreRows(backHoles).forEach(el => container.appendChild(el));
-    }
-    // --- Pulsante "Prossima buca" ---
     const nextBtn = document.createElement('button');
     nextBtn.innerText = currentHoleIndex + 1 < totalHoles ? 'Prossima buca' : 'Fine partita';
     nextBtn.classList.add('btn', 'next-hole-btn');
     nextBtn.addEventListener('click', () => {
         container.remove();
         currentHoleIndex++;
-        if (currentHoleIndex < totalHoles) {
-            startHole(currentHoleIndex);
-        } else {
-            showFinalScores();
-        }
+        if (currentHoleIndex < totalHoles) startHole(currentHoleIndex);
+        else showFinalScores();
     });
     container.appendChild(nextBtn);
 
@@ -248,15 +332,29 @@ function showFinalScores() {
     parP.innerText = `Par totale: ${totalPar} (${diffText})`;
     container.appendChild(parP);
 
-    // Pulsante restart (opzionale)
+    // Pulsante restart
     const restartBtn = document.createElement('button');
     restartBtn.innerText = 'Ricomincia partita';
     restartBtn.classList.add('btn');
     restartBtn.style.marginTop = '20px';
     restartBtn.addEventListener('click', () => {
         container.remove();
-        askHoles();
+
+        // Reset globale stato partita
+        resetGameState();
+
+        // Mostra di nuovo il main menu
+        mainMenu.style.display = 'flex';
+        rulesMenu.style.display = 'none';
+
+        // Reset selezioni e pulsanti
+        selectedHoles = null;
+        selectedMode = null;
+        mainMenu.querySelectorAll('[data-holes]').forEach(btn => btn.style.background = '');
+        mainMenu.querySelectorAll('[data-mode]').forEach(btn => btn.style.background = '');
     });
+
+
     container.appendChild(restartBtn);
 
     document.body.appendChild(container);
@@ -284,10 +382,15 @@ function startAdventure() {
     playerClubs = initialClubs;
 
     // Carte speciali iniziali: due numeri casuali tra 2 e 13
-    const specialNums = new Set([1]);
-    while (specialNums.size < 3) {
-        specialNums.add(Math.floor(Math.random() * 12) + 2); // 2..13
+    // Carte speciali iniziali
+    const allowedSpecials = [2, 6, 8, 9, 10, 11, 12]; // solo questi numeri
+    const specialNums = new Set([1]); // 1 sempre incluso
+
+    while (specialNums.size < 4) {
+        const pick = allowedSpecials[Math.floor(Math.random() * allowedSpecials.length)];
+        specialNums.add(pick);
     }
+
     playerSpecials = Specials.filter(s => specialNums.has(s.num));
 
     // Punteggio e monete iniziali
@@ -348,28 +451,6 @@ function startAdventureHole(index) {
     render();
 }
 // Funzione finishAdventureHole aggiornata
-function finishAdventureHole() {
-    const hole = adventureHoles[currentHoleIndexAdventure];
-
-    // --- Calcolo punti per questa buca (esempio semplice) ---
-    const points = 50; // qui puoi aggiungere logica più dettagliata come prima
-    playerScore += points;
-
-    // --- Calcolo monete ---
-    const coinsEarned = calculateCoins(strokes, hole.par, hole.difficulty);
-    playerCoins += coinsEarned;
-
-    // --- Log in console ---
-    console.log(`Buca ${currentHoleIndexAdventure + 1}: colpi=${strokes}, par=${hole.par}, difficoltà=${hole.difficulty}`);
-    console.log(`Punti guadagnati: ${points}, Monete guadagnate: ${coinsEarned}`);
-    console.log(`Totale punti: ${playerScore}, Totale monete: ${playerCoins}`);
-
-    // --- Mostra shop / schermata buca ---
-    showAdventureShop();
-}
-
-// Array globale per salvare i punteggi buca per buca
-let holePointsLog = [];
 
 function finishAdventureHole() {
     const hole = window.adventureHoles?.[currentHoleIndexAdventure];
@@ -387,19 +468,6 @@ function finishAdventureHole() {
     if (hole.tempPoints) {
         hole.tempPoints.details.forEach(d => holePoints.details.push(d));
         holePoints.total += hole.tempPoints.total;
-    }
-
-    // --- Bonus tiri anticipati al green ---
-    if (hole.tirosToGreenBeforePar) {
-        const bonus = hole.tirosToGreenBeforePar * 100;
-        holePoints.details.push({ reason: `Arrivato al green ${hole.tirosToGreenBeforePar} tiri prima del par`, points: bonus });
-        holePoints.total += bonus;
-    }
-
-    // --- Bonus se non si sono usati speciali ---
-    if (!hole.usedSpecial) {
-        holePoints.details.push({ reason: "Nessuno speciale usato", points: 10 });
-        holePoints.total += 10;
     }
 
     // --- Bonus par/birdie/eagle ---
@@ -497,14 +565,14 @@ function registerLanding(tileType) {
 
     let points = 0;
     if (tileType === 'fairway') points = 20;
-    else if (tileType === 'rough') points = 10;
-    else if(tileType === 'sand') points = 5;
+    else if (tileType === 'rough') points = -5;
+    else if (tileType === 'sand') points = -10;
+    else if (tileType === 'water') points = -20;
 
 
-    if (points > 0) {
-        hole.tempPoints.details.push({ reason: tileType.charAt(0).toUpperCase() + tileType.slice(1), points });
-        hole.tempPoints.total += points;
-    }
+
+    hole.tempPoints.details.push({ reason: tileType.charAt(0).toUpperCase() + tileType.slice(1), points });
+    hole.tempPoints.total += points;
 }
 function showAdventureShop() {
     // Rimuove eventuali vecchie modali e overlay
@@ -551,10 +619,12 @@ function showAdventureShop() {
         holesSubset.forEach((h, idx) => {
             const cell = document.createElement('div');
             cell.innerText = `B${idx + 1}`;
+            cell.style.fontSize = '1rem';
             headerRow.appendChild(cell);
         });
         const totalHeader = document.createElement('div');
         totalHeader.innerText = 'Totale';
+        totalHeader.style.fontSize = '1rem';
         headerRow.appendChild(totalHeader);
 
         const parRow = document.createElement('div');
@@ -575,45 +645,88 @@ function showAdventureShop() {
 
         return [headerRow, parRow, scoreRow];
 
-        function createCell(text) { const div = document.createElement('div'); div.innerText = text; return div; }
+        function createCell(text) {
+            const div = document.createElement('div');
+            div.innerText = text;
+            div.style.fontSize = '1rem';
+            return div;
+        }
     }
 
+    // --- Titolo con risultato della buca (più grande) ---
+    const currentHole = adventureHoles[currentHoleIndexAdventure];
+    const diff = currentHole.strokes - currentHole.par;
+    let resultText = '';
+
+    if (currentHole.strokes === 1) resultText = 'Hole in One';
+    else if (diff <= -3) resultText = 'Albatross';
+    else if (diff === -2) resultText = 'Eagle';
+    else if (diff === -1) resultText = 'Birdie';
+    else if (diff === 0) resultText = 'Par';
+    else if (diff === 1) resultText = 'Bogey';
+    else if (diff === 2) resultText = 'Doppio Bogey';
+    else if (diff >= 3) resultText = 'Triplo Bogey';
+
+    const resultStyle = {
+        'Hole in One': { color: '#ffd700', fontSize: '2rem', fontWeight: 'bold' },
+        'Albatross': { color: '#8a2be2', fontSize: '1.8rem', fontWeight: 'bold' },
+        'Eagle': { color: '#1e90ff', fontSize: '1.6rem', fontWeight: 'bold' },
+        'Birdie': { color: '#00bfff', fontSize: '1.5rem', fontWeight: 'bold' },
+        'Par': { color: '#7cfc00', fontSize: '1.3rem', fontWeight: 'bold' },
+        'Bogey': { color: '#ffff00', fontSize: '1.3rem', fontWeight: 'bold' },
+        'Doppio Bogey': { color: '#ff8c00', fontSize: '1.3rem', fontWeight: 'bold' },
+        'Triplo Bogey': { color: '#ff0000', fontSize: '1.3rem', fontWeight: 'bold' }
+    };
+
+    const style = resultStyle[resultText] || { color: '#000', fontSize: '1.3rem', fontWeight: 'bold' };
+    const infoRow = document.createElement('div');
+    infoRow.classList.add('score-info');
+    infoRow.innerText = `Buca ${currentHoleIndexAdventure + 1}: ${resultText}`;
+    infoRow.style.color = style.color;
+    infoRow.style.fontSize = style.fontSize;
+    infoRow.style.fontWeight = style.fontWeight;
+    infoRow.style.marginBottom = '1rem';
+    container.appendChild(infoRow);
+
+    // --- Scoreboard griglia par/strokes ---
     createScoreRows(frontHoles).forEach(el => container.appendChild(el));
     if (backHoles.length > 0) createScoreRows(backHoles).forEach(el => container.appendChild(el));
 
-    // --- Titolo e punteggio buca ---
-    const title = document.createElement('h2');
-    title.innerText = `Buca ${currentHoleIndexAdventure + 1} completata`;
-    container.appendChild(title);
-
+    // --- Dettagli punti della buca e monete ---
     const holePoints = holePointsLog[currentHoleIndexAdventure];
     if (holePoints) {
         const holeScoreContainer = document.createElement('div');
-        holeScoreContainer.style.marginBottom = '10px';
+        holeScoreContainer.style.marginTop = '0.5rem';
         holeScoreContainer.style.fontWeight = 'bold';
-        holePoints.details.forEach(d => {
-            const p = document.createElement('div');
-            p.innerText = `${d.reason}: +${d.points} punti`;
-            holeScoreContainer.appendChild(p);
-        });
+        holeScoreContainer.style.fontSize = '1rem';
+
         const totalDiv = document.createElement('div');
         totalDiv.innerText = `Totale buca: ${holePoints.total}`;
-        totalDiv.style.marginTop = '5px';
-        totalDiv.style.fontSize = '16px';
-        totalDiv.style.fontWeight = 'bold';
+        totalDiv.style.marginBottom = '0.5rem';
+        totalDiv.style.fontSize = '1.1rem';
         holeScoreContainer.appendChild(totalDiv);
+
+        holePoints.details.forEach(d => {
+            const p = document.createElement('div');
+            if (d.reason.toLowerCase().includes("monete")) {
+                p.innerText = `${d.reason}: +${d.points} monete`;
+            } else {
+                p.innerText = `${d.reason}: ${d.points} punti`;
+            }
+            holeScoreContainer.appendChild(p);
+        });
+
         container.appendChild(holeScoreContainer);
     }
 
-    // --- Totale punti e monete ---
+    // --- Stats Container (monete correnti) ---
     const statsContainer = document.createElement('div');
     statsContainer.style.display = 'flex';
-    statsContainer.style.justifyContent = 'space-between';
-    statsContainer.style.margin = '10px 0';
-    statsContainer.innerHTML = `
-        <div>Punti totali: ${playerScore}</div>
-        <div>Monete: ${playerCoins}</div>
-    `;
+    statsContainer.style.justifyContent = 'center';
+    statsContainer.style.fontSize = '1.5rem';
+    statsContainer.style.fontWeight = 'bold';
+    statsContainer.style.margin = '1rem 0 0.5rem 0';
+    statsContainer.innerText = `Monete: ${playerCoins}`;
     container.appendChild(statsContainer);
 
     // --- Shop: due box scrollabili ---
@@ -642,11 +755,34 @@ function showAdventureShop() {
     nextBtn.classList.add('btn');
     nextBtn.style.marginTop = '20px';
     nextBtn.addEventListener('click', () => {
-        container.remove();
-        overlay.remove(); // rimuove sempre l'overlay
-        currentHoleIndexAdventure++;
-        if (currentHoleIndexAdventure < totalHolesAdventure) startAdventureHole(currentHoleIndexAdventure);
-        else showAdventureFinalScore();
+        try {
+            container.remove();
+            overlay.remove();
+
+            // Avanza indice
+            currentHoleIndexAdventure++;
+
+            // Controlli di sicurezza
+            if (!adventureHoles || adventureHoles.length === 0) {
+                console.warn("⚠️ Nessuna buca avventura trovata, forzo fine partita");
+                showAdventureFinalScore();
+                return;
+            }
+            if (currentHoleIndexAdventure < 0) currentHoleIndexAdventure = 0;
+            if (currentHoleIndexAdventure >= totalHolesAdventure) {
+                console.log("🏁 Fine avventura forzata");
+                showAdventureFinalScore();
+                return;
+            }
+
+            // Avanza normalmente
+            console.log(`➡️ Passo alla buca ${currentHoleIndexAdventure + 1} / ${totalHolesAdventure}`);
+            startAdventureHole(currentHoleIndexAdventure);
+        } catch (err) {
+            console.error("Errore durante avanzamento buca:", err);
+            // Fallback: mostra comunque il finale
+            showAdventureFinalScore();
+        }
     });
     container.appendChild(nextBtn);
 
@@ -773,4 +909,93 @@ function createShopBoxes(clubs, specials, statsContainer) {
     };
 
     return [createBox(clubs, 'club'), createBox(specials, 'special')];
+}
+
+function showAdventureFinalScore() {
+    // Rimuove eventuali scoreboard precedenti
+    const old = document.querySelector('.scoreboard');
+    if (old) old.remove();
+
+    const container = document.createElement('div');
+    container.classList.add('scoreboard');
+    container.style.textAlign = 'center';
+    container.style.padding = '20px';
+    container.style.fontSize = '20px';
+    container.style.background = '#f5f5f5';
+    container.style.border = '2px solid #333';
+    container.style.borderRadius = '10px';
+    container.style.width = '350px';
+    container.style.margin = '40px auto';
+
+    // Calcola punteggi totali
+    let totalStrokes = 0;
+    let totalPar = 0;
+    adventureHoles.forEach(h => {
+        totalStrokes += h.strokes || 0;
+        totalPar += h.par || 0;
+    });
+
+    const diff = totalStrokes - totalPar;
+    const diffText = diff < 0 ? `${Math.abs(diff)} sotto al par` :
+        diff > 0 ? `${diff} sopra al par` : 'par';
+
+    // Titolo
+    const title = document.createElement('h2');
+    title.innerText = 'Complimenti!';
+    container.appendChild(title);
+
+    // Punteggio colpi
+    const scoreP = document.createElement('p');
+    scoreP.innerText = `Hai finito la partita con ${totalStrokes} colpi.`;
+    container.appendChild(scoreP);
+
+    // Par totale
+    const parP = document.createElement('p');
+    parP.innerText = `Par totale: ${totalPar} (${diffText})`;
+    container.appendChild(parP);
+
+    // Punti accumulati
+    const pointsP = document.createElement('p');
+    pointsP.innerText = `Punti totali: ${playerScore}`;
+    container.appendChild(pointsP);
+
+    // Conversione monete → punti
+    const bonusFromCoins = playerCoins * 10;
+    const coinsP = document.createElement('p');
+    coinsP.innerText = `Monete rimaste: ${playerCoins} (bonus ${bonusFromCoins} punti)`;
+    container.appendChild(coinsP);
+
+    // Totale finale
+    const finalTotal = playerScore + bonusFromCoins;
+    const finalP = document.createElement('p');
+    finalP.innerText = `Punteggio finale: ${finalTotal}`;
+    finalP.style.fontWeight = 'bold';
+    finalP.style.marginTop = '10px';
+    container.appendChild(finalP);
+
+    // Pulsante restart
+    const restartBtn = document.createElement('button');
+    restartBtn.innerText = 'Ricomincia partita';
+    restartBtn.classList.add('btn');
+    restartBtn.style.marginTop = '20px';
+    restartBtn.addEventListener('click', () => {
+        container.remove();
+
+        // Reset globale stato partita
+        resetGameState();
+
+        // Mostra di nuovo il main menu
+        mainMenu.style.display = 'flex';
+        rulesMenu.style.display = 'none';
+
+        // Reset selezioni e pulsanti
+        selectedHoles = null;
+        selectedMode = null;
+        mainMenu.querySelectorAll('[data-holes]').forEach(btn => btn.style.background = '');
+        mainMenu.querySelectorAll('[data-mode]').forEach(btn => btn.style.background = '');
+    });
+
+    container.appendChild(restartBtn);
+
+    document.body.appendChild(container);
 }

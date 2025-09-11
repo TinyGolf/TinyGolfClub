@@ -759,6 +759,15 @@
             strokes++;
             if (strokesEl) strokesEl.innerText = strokes;
 
+            // --- Differenzia modalità Adventure / Classic ---
+            const isAdventure = selectedMode === 'adventure';
+            let currentHole;
+            if (isAdventure && typeof adventureHoles !== 'undefined') {
+                if (!adventureHoles) throw new Error("adventureHoles non definito!");
+                currentHole = adventureHoles[currentHoleIndexAdventure];
+            } else {
+                currentHole = holes[currentHoleIndex];
+            }
             const startCol = ball.col;
             const startRow = ball.row;
             const flightTargetCol = clamp(startCol + deltaCol, 0, COLS - 1);
@@ -813,12 +822,16 @@
                     ball.row = clamp(Math.round(floatRow), 0, ROWS_TOTAL - 1);
 
                     const landedTile = mapGrid[ball.row][ball.col];
-                    if (landedTile === TILE.WATER) {
+
+                    // Se NON è un water shot, applica subito la penalità
+                    if (landedTile === TILE.WATER && (!selectedSpecial || selectedSpecial.name !== 'Water shot')) {
+                        strokes++;
+                        holes[currentHoleIndex].strokes++; // aggiorna colpi
                         ball.col = startCol;
                         ball.row = startRow;
                         viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
                         render();
-                        alert("Palla atterrata in acqua! Ritenta il colpo.");
+                        showMessage("Palla finita in acqua! Ritenta il colpo.");
                         return;
                     }
 
@@ -854,8 +867,37 @@
                     if (rollCol !== 0 || rollRow !== 0) {
                         setTimeout(() => {
                             rollBall(rollCol, rollRow, () => {
+                                // Durante il rotolamento, controlla se finisce in acqua
+                                if (mapGrid[ball.row][ball.col] === TILE.WATER) {
+                                    registerLanding('water');
+                                    strokes++;
+                                    holes[currentHoleIndex].strokes++; // aggiorna colpi
+                                    ball.col = startCol;
+                                    ball.row = startRow;
+                                    viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
+                                    render();
+                                    showMessage("Palla finita in acqua! Ritenta il colpo.");
+                                    return;
+                                }
                                 updateDistances();
-                                if (mapGrid[ball.row][ball.col] === TILE.GREEN) {
+                                // --- REGISTRA LANDING PUNTI ---
+                                const landedTile = mapGrid[ball.row][ball.col];
+                                if (landedTile === TILE.FAIRWAY) registerLanding('fairway');
+                                else if (landedTile === TILE.ROUGH) registerLanding('rough');
+                                else if (landedTile === TILE.SAND || landedTile === TILE.BUNKER) registerLanding('sand');
+                       
+                                // --- GREEN IN REGULATION ---
+                                if (landedTile === TILE.GREEN) {
+                                    const hole = currentHole;
+                                    if (strokes <= hole.par - 2 && !hole.hasGIR) {
+                                        const bonus = 100;
+                                        if (!hole.tempPoints) hole.tempPoints = { details: [], total: 0 };
+                                        hole.tempPoints.details.push({ reason: "Green in Regulation", points: bonus });
+                                        hole.tempPoints.total += bonus;
+                                        hole.hasGIR = true; // evita duplicati
+                                    }
+
+                                    // entra in puttMode
                                     const area = getGreenArea();
                                     if (area) {
                                         const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(area.minR, area.maxR, area.minC, area.maxC);
@@ -865,10 +907,13 @@
                                         render();
                                     }
                                 }
+
+                                updateDistances();
+                                checkHole();
                             });
                         }, 300); // pausa breve
                     } else {
-                        // nessun rotolo, controllo diretto buca
+                        // Nessun rotolo
                         if (mapGrid[ball.row][ball.col] === TILE.GREEN) {
                             const area = getGreenArea();
                             if (area) {
@@ -1047,7 +1092,8 @@
         }
 
         // UI: popola mazzi
-        window.populateDecks = function() {
+        window.populateDecks = function () {
+            // --- Mazze ---
             if (clubsDeckEl) {
                 clubsDeckEl.innerHTML = '';
 
@@ -1063,11 +1109,12 @@
                     else if (c.id.startsWith('wood')) el.classList.add('wood');
                     else if (c.id.startsWith('iron')) el.classList.add('iron');
                     else if (['wedge', 'sand', 'pitch'].includes(c.id)) el.classList.add(c.id);
+                    else if (c.id === 'putt') el.classList.add('putt');
 
                     el.innerHTML = `
-    <div class="title">${c.name}</div>
-    <div class="sub">⛳ ${c.distance || c.power} | ↘ ${c.roll || '-'} | 🎯 ${(c.accuracy ? c.accuracy * 100 : 0).toFixed(0)}%</div>
-    <div class="desc">📝 ${c.desc || ''}</div>
+<div class="title">${c.name}</div>
+<div class="sub">⛳ ${c.distance || c.power} | ↘ ${c.roll || '-'} | 🎯 ${(c.accuracy ? c.accuracy * 100 : 0).toFixed(0)}%</div>
+<div class="desc">📝 ${c.desc || ''}</div>
 `;
 
                     el.addEventListener('click', () => {
@@ -1083,17 +1130,19 @@
                 });
             }
 
+            // --- Specials ---
             if (specialDeckEl) {
                 specialDeckEl.innerHTML = '';
                 playerSpecials.forEach((s) => {
                     const el = document.createElement('div');
-                    el.className = 'card';
+                    el.classList.add('card');      // classe base
+                    el.classList.add(s.id);        // aggiunge la classe per colore: power, spin, special, curve, normale
                     el.tabIndex = 0;
 
                     el.innerHTML = `
-        <div class="title">${s.name}</div>
-        <div class="sub">✨ ${s.desc}</div>
-    `;
+<div class="title">${s.name}</div>
+<div class="sub">✨ ${s.desc}</div>
+`;
 
                     el.addEventListener('click', () => {
                         selectedSpecial = s;
