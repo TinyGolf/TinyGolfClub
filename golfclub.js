@@ -1077,11 +1077,27 @@
                         const dir = slopeGrid[r][c];
                         const influence = 0.075;
                         switch (dir) {
-                            case "UP": posRow -= influence; break;
-                            case "DOWN": posRow += influence; break;
-                            case "LEFT": posCol -= influence; break;
-                            case "RIGHT": posCol += influence; break;
-                        }
+    case "UP": posRow -= influence; break;
+    case "DOWN": posRow += influence; break;
+    case "LEFT": posCol -= influence; break;
+    case "RIGHT": posCol += influence; break;
+    case "UP-RIGHT":
+        posRow -= influence * Math.SQRT1_2;
+        posCol += influence * Math.SQRT1_2;
+        break;
+    case "UP-LEFT":
+        posRow -= influence * Math.SQRT1_2;
+        posCol -= influence * Math.SQRT1_2;
+        break;
+    case "DOWN-RIGHT":
+        posRow += influence * Math.SQRT1_2;
+        posCol += influence * Math.SQRT1_2;
+        break;
+    case "DOWN-LEFT":
+        posRow += influence * Math.SQRT1_2;
+        posCol -= influence * Math.SQRT1_2;
+        break;
+}
                     }
 
                     ball.rowZoom = Math.round(posRow);
@@ -1328,4 +1344,5 @@
         populateDecks();
         render();
     }
+
 })();
