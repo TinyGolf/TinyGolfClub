@@ -104,7 +104,6 @@
             ball.row = teeRow + 1;
             ball.col = teeCol + 2;
 
-
             // --- GREEN (smussato) ---
             let greenMinRow, greenMaxRow;
 
@@ -414,14 +413,20 @@
             ctx.save();
             ctx.translate(cx, cy);
 
-            // --- Ruota di 90° in senso orario per correggere la visualizzazione ---
-            const ninetyDeg = Math.PI / 2;
+            // --- Rotazioni in base alla direzione ---
+            const dirAngles = {
+                "UP": 0,
+                "UP-RIGHT": 45,
+                "RIGHT": 90,
+                "DOWN-RIGHT": 135,
+                "DOWN": 180,
+                "DOWN-LEFT": 225,
+                "LEFT": 270,
+                "UP-LEFT": 315
+            };
 
-            switch (dir) {
-                case 'UP': ctx.rotate(-Math.PI / 2 + ninetyDeg); break;
-                case 'DOWN': ctx.rotate(Math.PI / 2 + ninetyDeg); break;
-                case 'LEFT': ctx.rotate(Math.PI + ninetyDeg); break;
-                case 'RIGHT': ctx.rotate(0 + ninetyDeg); break;
+            if (dirAngles[dir] !== undefined) {
+                ctx.rotate((dirAngles[dir] * Math.PI) / 180);
             }
 
             // --- Disegna asta ---
@@ -512,9 +517,21 @@
                     }
                 }
             }
+            const totalHoles = holes.length;
+            let difficulty = 1;
+            if (totalHoles === 9) {
+                if (currentHoleIndex < 3) difficulty = 1;
+                else if (currentHoleIndex < 6) difficulty = 2;
+                else difficulty = 3;
+            } else if (totalHoles === 18) {
+                if (currentHoleIndex < 6) difficulty = 1;
+                else if (currentHoleIndex < 12) difficulty = 2;
+                else difficulty = 3;
+            }
+            const numReliefs = difficulty === 1 ? 1 : difficulty === 2 ? 2 : 3;
+            const numPatches = difficulty === 1 ? 1 : difficulty === 2 ? 1 : 2;
 
             // --- Procedural relievi sul green (resta identico) ---
-            const numReliefs = 2 + Math.floor(Math.random() * 3); // 2–4 anelli
             for (let p = 0; p < numReliefs; p++) {
                 const centerR = offsetR + Math.floor(Math.random() * greenZoomRows);
                 const centerC = offsetC + Math.floor(Math.random() * greenZoomCols);
@@ -532,25 +549,44 @@
                         const distance = Math.sqrt(dr * dr + dc * dc);
                         if (distance < innerRadius || distance > outerRadius) continue;
 
+                        let angle = Math.atan2(dr, dc); // dr = r - centerR, dc = c - centerC
+                        const deg = angle * 180 / Math.PI;
+
                         let dir;
                         if (type === "BOWL") {
-                            dir = Math.abs(dr) > Math.abs(dc) ? (dr > 0 ? "UP" : "DOWN") : (dc > 0 ? "LEFT" : "RIGHT");
+                            // "BOWL": la pendenza va verso il centro
+                            if (deg >= -22.5 && deg < 22.5) dir = "LEFT";
+                            else if (deg >= 22.5 && deg < 67.5) dir = "UP-LEFT";
+                            else if (deg >= 67.5 && deg < 112.5) dir = "UP";
+                            else if (deg >= 112.5 && deg < 157.5) dir = "UP-RIGHT";
+                            else if (deg >= 157.5 || deg < -157.5) dir = "RIGHT";
+                            else if (deg >= -157.5 && deg < -112.5) dir = "DOWN-RIGHT";
+                            else if (deg >= -112.5 && deg < -67.5) dir = "DOWN";
+                            else if (deg >= -67.5 && deg < -22.5) dir = "DOWN-LEFT";
                         } else {
-                            dir = Math.abs(dr) > Math.abs(dc) ? (dr > 0 ? "DOWN" : "UP") : (dc > 0 ? "RIGHT" : "LEFT");
+                            // "HILL": la pendenza va verso l’esterno
+                            if (deg >= -22.5 && deg < 22.5) dir = "RIGHT";
+                            else if (deg >= 22.5 && deg < 67.5) dir = "DOWN-RIGHT";
+                            else if (deg >= 67.5 && deg < 112.5) dir = "DOWN";
+                            else if (deg >= 112.5 && deg < 157.5) dir = "DOWN-LEFT";
+                            else if (deg >= 157.5 || deg < -157.5) dir = "LEFT";
+                            else if (deg >= -157.5 && deg < -112.5) dir = "UP-LEFT";
+                            else if (deg >= -112.5 && deg < -67.5) dir = "UP";
+                            else if (deg >= -67.5 && deg < -22.5) dir = "UP-RIGHT";
                         }
+
                         slopeGridLocal[r][c] = dir;
                     }
                 }
             }
 
             // --- Gradoni paralleli (resta identico) ---
-            const numPatches = 1 + Math.floor(Math.random() * 3);
             for (let p = 0; p < numPatches; p++) {
                 const centerR = offsetR + Math.floor(Math.random() * greenZoomRows);
                 const centerC = offsetC + Math.floor(Math.random() * greenZoomCols);
 
                 const height = 1 + Math.floor(Math.random() * 2);
-                const width = 6 + Math.floor(Math.random() * 3);
+                const width = 4 + Math.floor(Math.random() * 3);
                 const horizontal = Math.random() < 0.5;
                 const arrow = horizontal ? (Math.random() < 0.5 ? "LEFT" : "RIGHT") : (Math.random() < 0.5 ? "UP" : "DOWN");
 
@@ -705,8 +741,10 @@
                                     distanceFactor = 0;
                                     rollFactor = 1;
                                 } else {
-                                    distanceFactor = 0.75;
-                                    rollFactor = 0.75;
+                                    if (selectedClub.id === 'iron') {
+                                        distanceFactor = 0.75;
+                                        rollFactor = 0.75;
+                                    }
                                 }
                             }
                         }
@@ -728,15 +766,23 @@
                     }
                     break;
                 case TILE.TEE:
-                    if (selectedClub.id === 'driver' || selectedClub.id === 'wood') {
-                        distanceFactor = 1.1;
+                    if (selectedClub.id === 'driver') {
+                        distanceFactor = 1.25;
                         rollFactor = 1.1;
+                    }
+                    else if (selectedClub.id === 'wood') {
+                            distanceFactor = 1.1;
+                            rollFactor = 1;
                     }
                     break;
                 case TILE.FAIRWAY:
-                    if (selectedClub.id === 'driver' || selectedClub.id === 'wood') {
-                        distanceFactor = 0.8;
-                        rollFactor = 0.8;
+                    if (selectedClub.id === 'driver') {
+                        distanceFactor = 0.75;
+                        rollFactor = 0.75;
+                    }
+                    else if (selectedClub.id === 'wood') {
+                        distanceFactor = 0.9;
+                        rollFactor = 0.9;
                     }
                     break;
                 case TILE.GREEN:
@@ -950,8 +996,18 @@
                     if (Math.random() < 0.5) {
                         // 50% probabilità di completare la buca subito
                         setTimeout(() => {
+                            const area = getGreenArea();
+                            if (area) {
+                                const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(
+                                    area.minR, area.maxR, area.minC, area.maxC
+                                );
+                                currentGrid = zoomGrid;
+                                slopeGrid = slopes;
+                                puttMode = false;
+                            }
                             handleHole();
                         }, 500);
+
                     } else {
                         // Altrimenti entra in modalità putt/zoom sul green
                         const area = getGreenArea();
@@ -1123,6 +1179,7 @@
                         selectedClub = c;
                         clubsDeckEl.querySelectorAll('.card').forEach(x => x.style.outline = '');
                         el.style.outline = '3px solid #1f8feb';
+                        updateShotInfo();
                     });
 
                     clubsDeckEl.appendChild(el);
@@ -1150,6 +1207,7 @@
                         selectedSpecial = s;
                         specialDeckEl.querySelectorAll('.card').forEach(x => x.style.outline = '');
                         el.style.outline = '3px dashed #ff9900';
+                        updateShotInfo();
                     });
 
                     specialDeckEl.appendChild(el);
@@ -1157,6 +1215,93 @@
             }
         }
 
+        function updateShotInfo() {
+            if (!selectedClub) return;
+
+            const startTile = mapGrid[ball.row][ball.col];
+            let distanceFactor = 1;
+            let rollFactor = 1;
+
+            switch (startTile) {
+                case TILE.ROUGH:
+                    if (selectedSpecial && selectedSpecial.name === 'Rough shot') {
+                        distanceFactor = 0.9;
+                        rollFactor = 0.9;
+                    } else {
+                        if (selectedClub.id === 'driver' || selectedClub.id === 'wood') {
+                            distanceFactor = 0.5;
+                            rollFactor = 0.5;
+                        } else if (['pitch', 'sand', 'wedge'].includes(selectedClub.id)) {
+                            distanceFactor = 0.9;
+                            rollFactor = 0.9;
+                        } else if (selectedClub.id === 'putt') {
+                            distanceFactor = 0;
+                            rollFactor = 1;
+                        } else if (selectedClub.id === 'iron') {
+                            distanceFactor = 0.75;
+                            rollFactor = 0.75;
+                        }
+                    }
+                    break;
+
+                case TILE.BUNKER:
+                    if (selectedSpecial && selectedSpecial.name === 'Sand shot') {
+                        distanceFactor = 1;
+                        rollFactor = 1;
+                    } else {
+                        if (['sand', 'putt'].includes(selectedClub.id)) {
+                            distanceFactor = 1;
+                            rollFactor = 1;
+                        } else {
+                            distanceFactor = 0.5;
+                            rollFactor = 0.5;
+                        }
+                    }
+                    break;
+
+                case TILE.TEE:
+                    if (selectedClub.id === 'driver') {
+                        distanceFactor = 1.25;
+                        rollFactor = 1.1;
+                    } else if (selectedClub.id === 'wood') {
+                        distanceFactor = 1.1;
+                        rollFactor = 1;
+                    }
+                    break;
+
+                case TILE.FAIRWAY:
+                    if (selectedClub.id === 'driver') {
+                        distanceFactor = 0.75;
+                        rollFactor = 0.75;
+                    } else if (selectedClub.id === 'wood') {
+                        distanceFactor = 0.9;
+                        rollFactor = 0.9;
+                    }
+                    break;
+
+                case TILE.GREEN:
+                default:
+                    distanceFactor = 1;
+                    rollFactor = 1;
+                    break;
+            }
+
+            // Applica special effect
+            let distanceModifier = 1;
+            let rollModifier = 1;
+            if (selectedSpecial && typeof selectedSpecial.modify === 'function') {
+                const testShot = { distance: 1, roll: 1, curve: 0 };
+                selectedSpecial.modify(testShot);
+                distanceModifier = testShot.distance;
+                rollModifier = testShot.roll;
+            }
+
+            const powerPercent = Math.round(distanceFactor * distanceModifier * 100);
+            const rollPercent = Math.round(rollFactor * rollModifier * 100);
+
+            document.getElementById('powerDisplay').innerText = `Potenza: ${powerPercent}%`;
+            document.getElementById('rollDisplay').innerText = `Rotolamento: ${rollPercent}%`;
+        }
 
         const camUpBtn = document.getElementById('camUpBtn');
         const camDownBtn = document.getElementById('camDownBtn');

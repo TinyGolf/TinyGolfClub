@@ -602,6 +602,32 @@ function startTournamentAdventure() {
 }
 
 // Funzione finishAdventureHole aggiornata
+// --- registra atterraggio su una tile e accumula punti temporanei ---
+function registerLanding(tileType) {
+    const hole = holes[currentHoleIndex];
+    if (!hole) return;
+
+    // Inizializza tempPoints se non esiste
+    if (!hole.tempPoints) hole.tempPoints = { details: [], total: 0 };
+
+    let points = 0;
+    switch (tileType) {
+        case 'fairway': points = 20; break;
+        case 'rough': points = -5; break;
+        case 'sand': points = -10; break;
+        case 'water': points = -20; break;
+        default: points = 0; break;
+    }
+
+    // Salva nel log temporaneo della buca
+    hole.tempPoints.details.push({
+        reason: tileType.charAt(0).toUpperCase() + tileType.slice(1),
+        points
+    });
+    hole.tempPoints.total += points;
+}
+
+// --- termina la buca in adventure e calcola punti/monete ---
 function finishAdventureHole() {
     const hole = holes[currentHoleIndex];
     if (!hole) {
@@ -617,6 +643,7 @@ function finishAdventureHole() {
         total: 0
     };
 
+    // Aggiungi punti temporanei dalle tiles
     if (hole.tempPoints) {
         hole.tempPoints.details.forEach(d => holePoints.details.push(d));
         holePoints.total += hole.tempPoints.total;
@@ -650,7 +677,7 @@ function finishAdventureHole() {
         holePoints.total += 5;
     }
 
-    // --- Calcolo difficoltà ---
+    // Calcolo difficoltà buca
     const totalHoles = holes.length;
     let difficulty = 1;
     if (totalHoles === 9) {
@@ -663,108 +690,66 @@ function finishAdventureHole() {
         else difficulty = 3;
     }
 
-    // --- Calcolo monete ---
+    // Calcolo monete
     const coinsEarned = calculateCoins(strokes, hole.par, difficulty);
     playerCoins += coinsEarned;
     holePoints.details.push({ reason: `Monete guadagnate`, points: coinsEarned });
 
-    // --- Salva log ---
+    // Salva log
     holePointsLog.push(holePoints);
 
+    // Log console
     console.group(`🏌️‍♂️ Buca ${holePoints.holeNumber} finita in ${strokes} colpi (par ${hole.par})`);
     holePoints.details.forEach(d => console.log(`${d.reason}: +${d.points}`));
     console.log("Totale punti buca:", holePoints.total);
     console.log("Monete guadagnate:", coinsEarned, "Totali:", playerCoins);
     console.groupEnd();
 
+    // Aggiorna punteggio globale e reset tempPoints
     playerScore += holePoints.total;
     delete hole.tempPoints;
 
-    // Vai allo shop
+    // Apri shop
     showAdventureShop();
 }
-    // Funzione per calcolare quante monete si guadagnano in base al risultato e alla difficoltà
-    function calculateCoins(strokes, par, difficulty) {
-        const diff = par - strokes; // differenza tra par e colpi
-        let coins = 0;
 
-        // Mappa difficoltà → premi base
-        const rewards = {
-            1: { subPar:1, par: 3, birdie: 5, eagle: 8, albatross: 15, holeInOne: 30 },
-            2: { subPar: 3, par: 6, birdie: 10, eagle: 15, albatross: 23, holeInOne: 40 },
-            3: { subPar: 5, par: 10, birdie: 15, eagle: 25, albatross: 30, holeInOne: 55 }
-        };
+// --- funzione per calcolare monete in base a risultato e difficoltà ---
+function calculateCoins(strokes, par, difficulty) {
+    const diff = par - strokes;
+    const rewards = {
+        1: { subPar: 1, par: 3, birdie: 5, eagle: 8, albatross: 15, holeInOne: 30 },
+        2: { subPar: 3, par: 6, birdie: 10, eagle: 15, albatross: 23, holeInOne: 40 },
+        3: { subPar: 5, par: 10, birdie: 15, eagle: 25, albatross: 30, holeInOne: 55 }
+    };
+    const r = rewards[difficulty] || rewards[1];
 
-        const r = rewards[difficulty] || rewards[1]; // default se difficoltà sconosciuta
-
-        if (strokes === 1) coins = r.holeInOne; // Hole in one
-        else if (diff === 3) coins = r.albatross; // Albatross
-        else if (diff === 2) coins = r.eagle;   // Eagle
-        else if (diff === 1) coins = r.birdie;  // Birdie
-        else if (diff === 0) coins = r.par;     // Par
-        else if (diff < 0) coins =r.subPar; // sopra par, riduci premi ma minimo 0
-
-        return coins;
-    }
-
-function registerLanding(tileType) {
-    const hole = adventureHoles[currentHoleIndexAdventure];
-    if (!hole) return;
-
-    // Assicura che esista già il log della buca
-    if (!hole.tempPoints) hole.tempPoints = { details: [], total: 0 };
-
-    let points = 0;
-    if (tileType === 'fairway') points = 20;
-    else if (tileType === 'rough') points = -5;
-    else if (tileType === 'sand') points = -10;
-    else if (tileType === 'water') points = -20;
-
-
-
-    hole.tempPoints.details.push({ reason: tileType.charAt(0).toUpperCase() + tileType.slice(1), points });
-    hole.tempPoints.total += points;
+    if (strokes === 1) return r.holeInOne;
+    if (diff >= 3) return r.albatross;
+    if (diff === 2) return r.eagle;
+    if (diff === 1) return r.birdie;
+    if (diff === 0) return r.par;
+    if (diff < 0) return r.subPar;
+    return 0;
 }
+
+// --- mostra modale shop con tutti i dettagli della buca ---
 function showAdventureShop() {
-    // Rimuove eventuali vecchie modali e overlay
     document.querySelectorAll('.shop-popup, .modal-overlay').forEach(el => el.remove());
 
-    // --- Crea overlay ---
     const overlay = document.createElement('div');
     overlay.classList.add('modal-overlay');
-    Object.assign(overlay.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        height: '100%',
-        background: 'rgba(0,0,0,0.5)',
-        zIndex: 999
-    });
+    Object.assign(overlay.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 999 });
     document.body.appendChild(overlay);
 
-    // --- Crea container modale ---
     const container = document.createElement('div');
     container.classList.add('shop-popup');
-    Object.assign(container.style, {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 1000,
-        background: '#f5f5f5',
-        padding: '20px',
-        border: '2px solid #333',
-        borderRadius: '10px',
-        width: '600px'
-    });
+    Object.assign(container.style, { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1000, background: '#f5f5f5', padding: '20px', border: '2px solid #333', borderRadius: '10px', width: '600px' });
     document.body.appendChild(container);
 
-    // --- Recupera buca corrente ---
     const currentHole = holes[currentHoleIndex];
     const diff = currentHole.strokes - currentHole.par;
 
-    // --- Titolo con risultato della buca ---
+    // Titolo buca con risultato
     let resultText = '';
     if (currentHole.strokes === 1) resultText = 'Hole in One';
     else if (diff <= -3) resultText = 'Albatross';
@@ -790,62 +775,37 @@ function showAdventureShop() {
     const infoRow = document.createElement('div');
     infoRow.classList.add('score-info');
     infoRow.innerText = `Buca ${currentHoleIndex + 1}: ${resultText}`;
-    Object.assign(infoRow.style, {
-        color: style.color,
-        fontSize: style.fontSize,
-        fontWeight: style.fontWeight,
-        marginBottom: '1rem'
-    });
+    Object.assign(infoRow.style, { color: style.color, fontSize: style.fontSize, fontWeight: style.fontWeight, marginBottom: '1rem' });
     container.appendChild(infoRow);
 
-    // --- Scoreboard buche completate ---
+    // Scoreboard buche
     const frontHoles = holes.slice(0, Math.min(9, holes.length));
     const backHoles = holes.length > 9 ? holes.slice(9) : [];
 
     function createScoreRows(holesSubset) {
-        const headerRow = document.createElement('div');
-        headerRow.classList.add('score-row');
-        holesSubset.forEach((h, idx) => {
-            const cell = document.createElement('div');
-            cell.innerText = `B${idx + 1}`;
-            cell.style.fontSize = '1rem';
-            headerRow.appendChild(cell);
-        });
-        const totalHeader = document.createElement('div');
-        totalHeader.innerText = 'Totale';
-        totalHeader.style.fontSize = '1rem';
-        headerRow.appendChild(totalHeader);
+        const headerRow = document.createElement('div'); headerRow.classList.add('score-row');
+        holesSubset.forEach((h, idx) => { const cell = document.createElement('div'); cell.innerText = `B${idx + 1}`; headerRow.appendChild(cell); });
+        const totalHeader = document.createElement('div'); totalHeader.innerText = 'Totale'; headerRow.appendChild(totalHeader);
 
-        const parRow = document.createElement('div');
-        parRow.classList.add('score-row');
+        const parRow = document.createElement('div'); parRow.classList.add('score-row');
         let totalPar = 0;
-        holesSubset.forEach(h => { parRow.appendChild(createCell(h.par)); totalPar += h.par; });
+        holesSubset.forEach(h => { const cell = document.createElement('div'); cell.innerText = h.par; parRow.appendChild(cell); totalPar += h.par; });
         parRow.appendChild(createCell(totalPar));
 
-        const scoreRow = document.createElement('div');
-        scoreRow.classList.add('score-row');
+        const scoreRow = document.createElement('div'); scoreRow.classList.add('score-row');
         let totalStrokes = 0;
-        holesSubset.forEach(h => {
-            const val = h.strokes > 0 ? h.strokes : '-';
-            scoreRow.appendChild(createCell(val));
-            if (h.strokes > 0) totalStrokes += h.strokes;
-        });
+        holesSubset.forEach(h => { const val = h.strokes > 0 ? h.strokes : '-'; scoreRow.appendChild(createCell(val)); if (h.strokes > 0) totalStrokes += h.strokes; });
         scoreRow.appendChild(createCell(totalStrokes));
 
         return [headerRow, parRow, scoreRow];
 
-        function createCell(text) {
-            const div = document.createElement('div');
-            div.innerText = text;
-            div.style.fontSize = '1rem';
-            return div;
-        }
+        function createCell(text) { const div = document.createElement('div'); div.innerText = text; div.style.fontSize = '1rem'; return div; }
     }
 
     createScoreRows(frontHoles).forEach(el => container.appendChild(el));
     if (backHoles.length > 0) createScoreRows(backHoles).forEach(el => container.appendChild(el));
 
-    // --- Dettagli punti della buca e monete ---
+    // --- Dettagli punti e tile ---
     const holePoints = holePointsLog[currentHoleIndex];
     if (holePoints) {
         const holeScoreContainer = document.createElement('div');
@@ -859,29 +819,22 @@ function showAdventureShop() {
 
         holePoints.details.forEach(d => {
             const p = document.createElement('div');
-            p.innerText = d.reason.toLowerCase().includes("monete") ? `${d.reason}: +${d.points} monete` : `${d.reason}: ${d.points} punti`;
+            if (d.reason.toLowerCase().includes("monete")) p.innerText = `${d.reason}: +${d.points} monete`;
+            else p.innerText = `${d.reason}: ${d.points} punti`;
             holeScoreContainer.appendChild(p);
         });
-
         container.appendChild(holeScoreContainer);
     }
 
     // --- Stats container ---
     const statsContainer = document.createElement('div');
-    Object.assign(statsContainer.style, {
-        display: 'flex',
-        justifyContent: 'center',
-        fontSize: '1.5rem',
-        fontWeight: 'bold',
-        margin: '1rem 0 0.5rem 0'
-    });
+    Object.assign(statsContainer.style, { display: 'flex', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', margin: '1rem 0 0.5rem 0' });
     statsContainer.innerText = `Monete: ${playerCoins}`;
     container.appendChild(statsContainer);
 
-    // --- Shop: club e special ---
+    // --- Shop ---
     const shopContainer = document.createElement('div');
     Object.assign(shopContainer.style, { display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' });
-
     const totalHolesCount = holes.length;
     const step = totalHolesCount === 9 ? 3 : 6;
     let difficulty = currentHoleIndex < step ? 1 : currentHoleIndex < step * 2 ? 2 : 3;
@@ -891,60 +844,22 @@ function showAdventureShop() {
     shopContainer.appendChild(specialsBox);
     container.appendChild(shopContainer);
 
-    // --- Pulsante prossima buca / fine partita ---
+    // --- Pulsante prossima buca ---
     const nextBtn = document.createElement('button');
     nextBtn.innerText = currentHoleIndex + 1 < holes.length ? 'Prossima buca' : 'Fine partita';
     nextBtn.classList.add('btn', 'next-hole-btn');
     nextBtn.addEventListener('click', () => {
-        console.log("🔹 Click Next Hole");
-        console.log("Current hole index before increment:", currentHoleIndex);
-        console.log("Total holes:", holes.length);
-        console.log("Putt mode:", puttMode);
-        console.log("Overlay/modale presenti:", document.querySelectorAll('.modal-overlay, .shop-popup').length);
+        document.querySelectorAll('.shop-popup,.modal-overlay').forEach(el => el.remove());
+        if (window.activeRafId) { cancelAnimationFrame(window.activeRafId); window.activeRafId = null; }
+        let highestTimeoutId = setTimeout(";"); for (let i = 0; i < highestTimeoutId; i++) { clearTimeout(i); clearInterval(i); }
 
-        try {
-            // --- Pulizia UI precedente ---
-            document.querySelectorAll('.shop-popup, .modal-overlay').forEach(el => el.remove());
-
-            // --- Pulizia animazioni / timer ---
-            if (window.activeRafId) {
-                cancelAnimationFrame(window.activeRafId);
-                window.activeRafId = null;
-            }
-            let highestTimeoutId = setTimeout(";");
-            for (let i = 0; i < highestTimeoutId; i++) {
-                clearTimeout(i);
-                clearInterval(i);
-            }
-
-            // --- Reset stato buca ---
-            puttMode = false;
-            currentGrid = null;
-            slopeGrid = null;
-            ball.rowZoom = null;
-            ball.colZoom = null;
-
-            // --- Avanza indice buca ---
-            currentHoleIndex++;
-            console.log("Current hole index after increment:", currentHoleIndex);
-
-            if (currentHoleIndex >= holes.length) {
-                console.log("🏁 Fine avventura o torneo");
-                showAdventureFinalScore();
-                return;
-            }
-
-            console.log(`➡️ Partenza buca ${currentHoleIndex + 1}`);
-            startHole(currentHoleIndex);
-        } catch (err) {
-            console.error("Errore durante avanzamento buca:", err);
-            showAdventureFinalScore();
-        }
+        puttMode = false; currentGrid = null; slopeGrid = null; ball.rowZoom = null; ball.colZoom = null;
+        currentHoleIndex++;
+        if (currentHoleIndex >= holes.length) { showAdventureFinalScore(); return; }
+        startHole(currentHoleIndex);
     });
-
     container.appendChild(nextBtn);
 }
-
 
 // --- Funzioni di shop ---
 const probabilityTable = { 1: [0.7, 0.25, 0.05], 2: [0.3, 0.5, 0.2], 3: [0.1, 0.3, 0.6] };
@@ -1086,21 +1001,23 @@ function showAdventureFinalScore() {
 
     const container = document.createElement('div');
     container.classList.add('scoreboard');
-    container.style.textAlign = 'center';
-    container.style.padding = '20px';
-    container.style.fontSize = '20px';
-    container.style.background = '#f5f5f5';
-    container.style.border = '2px solid #333';
-    container.style.borderRadius = '10px';
-    container.style.width = '350px';
-    container.style.margin = '40px auto';
+    Object.assign(container.style, {
+        textAlign: 'center',
+        padding: '20px',
+        fontSize: '20px',
+        background: '#f5f5f5',
+        border: '2px solid #333',
+        borderRadius: '10px',
+        width: '350px',
+        margin: '40px auto'
+    });
 
-    // Calcola punteggi totali
+    // --- Totale colpi e par ---
     let totalStrokes = 0;
     let totalPar = 0;
-    adventureHoles.forEach(h => {
-        totalStrokes += h.strokes || 0;
-        totalPar += h.par || 0;
+    holePointsLog.forEach(hp => {
+        totalStrokes += hp.strokes || hp.strokes === 0 ? hp.strokes : 0;
+        totalPar += hp.par || 0;
     });
 
     const diff = totalStrokes - totalPar;
@@ -1122,12 +1039,34 @@ function showAdventureFinalScore() {
     parP.innerText = `Par totale: ${totalPar} (${diffText})`;
     container.appendChild(parP);
 
-    // Punti accumulati
+    // --- Totali punti ---
     const pointsP = document.createElement('p');
     pointsP.innerText = `Punti totali: ${playerScore}`;
     container.appendChild(pointsP);
 
-    // Conversione monete → punti
+    // --- Totali per categoria ---
+    const categoryTotals = {};
+    holePointsLog.forEach(hp => {
+        hp.details.forEach(d => {
+            const key = d.reason;
+            if (!categoryTotals[key]) categoryTotals[key] = 0;
+            categoryTotals[key] += d.points;
+        });
+    });
+
+    const catTitle = document.createElement('p');
+    catTitle.innerText = 'Punti per categoria:';
+    catTitle.style.fontWeight = 'bold';
+    catTitle.style.marginTop = '10px';
+    container.appendChild(catTitle);
+
+    Object.keys(categoryTotals).forEach(cat => {
+        const p = document.createElement('p');
+        p.innerText = `${cat}: ${categoryTotals[cat]} punti`;
+        container.appendChild(p);
+    });
+
+    // Conversione monete → punti bonus
     const bonusFromCoins = playerCoins * 10;
     const coinsP = document.createElement('p');
     coinsP.innerText = `Monete rimaste: ${playerCoins} (bonus ${bonusFromCoins} punti)`;
@@ -1148,15 +1087,9 @@ function showAdventureFinalScore() {
     restartBtn.style.marginTop = '20px';
     restartBtn.addEventListener('click', () => {
         container.remove();
-
-        // Reset globale stato partita
         resetGameState();
-
-        // Mostra di nuovo il main menu
         mainMenu.style.display = 'flex';
         rulesMenu.style.display = 'none';
-
-        // Reset selezioni e pulsanti
         selectedHoles = null;
         selectedMode = null;
         mainMenu.querySelectorAll('[data-holes]').forEach(btn => btn.style.background = '');
@@ -1164,6 +1097,5 @@ function showAdventureFinalScore() {
     });
 
     container.appendChild(restartBtn);
-
     document.body.appendChild(container);
 }

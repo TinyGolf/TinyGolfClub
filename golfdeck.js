@@ -22,7 +22,7 @@ const Clubs = [
     { num: 4, cost: 14, id: 'wood', name: 'Legno-5', distance: 11, roll: 4, accuracy: 0.9, desc: 'Lungo, meno efficacie da terra' },
     { num: 3, cost: 15, id: 'wood', name: 'Legno-4', distance: 12, roll: 4, accuracy: 0.85, desc: 'Lungo, meno efficacie da terra' },
     { num: 2, cost: 20, id: 'wood', name: 'Legno-3', distance: 13, roll: 5, accuracy: 0.85, desc: 'Lungo, meno efficacie da terra' },
-    { num: 1, cost: 25, id: 'driver', name: 'Driver', distance: 15, roll: 5.5, accuracy: 0.8, desc: 'Lunghissimo, solo dal tee' }
+    { num: 1, cost: 25, id: 'driver', name: 'Driver', distance: 14, roll: 5, accuracy: 0.8, desc: 'Lunghissimo, solo dal tee' }
 ];
 
 

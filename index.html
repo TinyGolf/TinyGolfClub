@@ -84,12 +84,14 @@
         <!-- Game map (canvas) -->
         <section class="map-wrap">
             <canvas id="mapCanvas" width="400" height="400" aria-label="Mappa del campo"></canvas>
+            <div class="shot-info">
+                <span id="powerDisplay">Potenza: 100%</span> |
+                <span id="rollDisplay">Rotolamento: 100%</span>
+            </div>
         </section>
-
 
         <!-- Card area -->
         <section class="cards">
-            <div class="deck-label">Mazzi</div>
             <div id="clubsDeck" class="deck horizontal-scroll"></div>
             <div class="deck-label">Carte Speciali</div>
             <div id="specialDeck" class="deck horizontal-scroll"></div>
