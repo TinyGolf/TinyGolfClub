@@ -58,6 +58,78 @@ mainMenu.querySelectorAll('[data-mode]').forEach(btn => {
     });
 });
 
+window.addEventListener('error', e => {
+    console.group("❌ Catturato errore globale");
+    console.log("📌 Messaggio:", e.message);
+    console.log("📂 File:", e.filename);
+    console.log("📏 Linea:", e.lineno, "Colonna:", e.colno);
+    console.log("🧩 Oggetto error:", e.error);
+    console.log("🔍 Stack:", e.error?.stack || "Nessuno stack disponibile");
+    console.groupEnd();
+
+    alert("Errore non gestito: " + e.message);
+
+    try {
+        showFinalScores();
+    } catch (err2) {
+        console.warn("⚠️ Anche showFinalScores ha generato un errore:", err2);
+        location.reload(); // fallback
+    }
+});
+
+// --- Gestione sicura RAF e Timer ---
+const activeRafs = new Set();
+const activeTimers = new Set();
+
+function safeSetTimeout(fn, delay) {
+    const id = setTimeout(() => {
+        activeTimers.delete(id);
+        fn();
+    }, delay);
+    activeTimers.add(id);
+    return id;
+}
+
+function safeClearAllTimers() {
+    for (const id of activeTimers) {
+        clearTimeout(id);
+        clearInterval(id); // solo se usi anche setInterval
+    }
+    activeTimers.clear();
+}
+
+function safeRequestFrame(fn) {
+    let id;
+    id = requestAnimationFrame((timestamp) => {
+        activeRafs.delete(id);
+        fn(timestamp);
+    });
+    activeRafs.add(id);
+    return id;
+}
+
+function safeCancelFrame() {
+    for (const id of activeRafs) cancelAnimationFrame(id);
+    activeRafs.clear();
+}
+
+// --- Reset dello stato buca / animazioni ---
+function resetHoleState() {
+    puttMode = false;
+    currentGrid = null;
+    slopeGrid = null;
+
+    // Se ball ha proprietà zoom, resetta
+    if (ball) {
+        ball.rowZoom = null;
+        ball.colZoom = null;
+    }
+
+    // Cancella tutte le animazioni e timer pendenti
+    safeClearAllTimers();
+    safeCancelFrame();
+}
+
 function showMessage(message, callback) {
     // Rimuovi eventuale finestra precedente
     const old = document.querySelector('.custom-alert');
@@ -111,8 +183,6 @@ function resetGameState() {
     strokes = 0;
 
     // --- Reset variabili globali avventura ---
-    adventureHoles = [];
-    currentHoleIndexAdventure = 0;
     totalHolesAdventure = 0;
     holePointsLog = [];
 
@@ -163,25 +233,6 @@ function resetGameState() {
     console.log("✅ Stato riportato a zero");
 }
 
-function resetHoleState() {
-    puttMode = false;
-    currentGrid = null;
-    slopeGrid = null;
-
-    // Se ball ha proprietà zoom, resetta
-    if (ball) {
-        ball.rowZoom = null;
-        ball.colZoom = null;
-    }
-
-    // Eventuali timeout o animationFrame pendenti
-    let highestTimeoutId = setTimeout(";");
-    for (let i = 0; i <= highestTimeoutId; i++) {
-        clearTimeout(i);
-        clearInterval(i);
-        cancelAnimationFrame(i);
-    }
-}
 
 function clearPreviousHoleUI() {
     // Rimuove vecchi overlay, shop, modali
@@ -265,6 +316,12 @@ function startTournament(numHoles, mode) {
 
 // --- Avvia singola buca ---
 function startHole(index) {
+    // --- Reset sicuro ---
+    safeClearAllTimers();
+    safeCancelFrame();
+    clearPreviousHoleUI?.();
+    resetHoleState?.();
+
     const hole = holes[index];
     if (!hole) {
         console.warn("startHole chiamata ma hole undefined!", index, holes);
@@ -283,6 +340,8 @@ function startHole(index) {
     updateWindDisplay();
     render();
 }
+
+
 function updateHUD(index, strokes) {
     const holeNumberEl = document.getElementById('holeNumber');
     if (holeNumberEl) holeNumberEl.innerText = index + 1;
@@ -425,51 +484,25 @@ function showScoreboard() {
     nextBtn.style.marginTop = '20px';
     container.appendChild(nextBtn);
 
-    nextBtn.addEventListener('click', () => {
-        nextBtn.disabled = true; // previene doppi click
-        console.log("🔹 Click Next Hole");
-        console.log("Indice buca prima incremento:", currentHoleIndex);
-        console.log("Totale buche:", holes.length);
-
+    nextBtn.addEventListener('click', function handler() {
+        nextBtn.removeEventListener('click', handler);
+        nextBtn.disabled = true;
+        console.log("activeRefs:", activeRafs.size, "activeTimers:", activeTimers.size);
         try {
-            // --- Pulisci overlay e scoreboard ---
-            document.querySelectorAll('.scoreboard, .modal-overlay, .shop-popup').forEach(el => el.remove());
+            safeClearAllTimers();
+            safeCancelFrame();
 
-            // --- Pulisci animazioni / timer ---
-            if (window.activeRafId) {
-                cancelAnimationFrame(window.activeRafId);
-                window.activeRafId = null;
-            }
-            let highestTimeoutId = setTimeout(";");
-            for (let i = 0; i < highestTimeoutId; i++) {
-                clearTimeout(i);
-                clearInterval(i);
-            }
-
-            // --- Reset stato buca ---
-            puttMode = false;
-            currentGrid = null;
-            slopeGrid = null;
-            ball.rowZoom = null;
-            ball.colZoom = null;
-
-            // --- Avanza indice ---
-            currentHoleIndex++;
-            console.log("Indice buca dopo incremento:", currentHoleIndex);
-
-            if (currentHoleIndex >= holes.length) {
-                console.log("🏁 Fine partita");
+            if (currentHoleIndex + 1 < totalHoles) {
+                startHole(currentHoleIndex + 1);
+            } else {
                 showFinalScores();
-                return;
             }
-
-            console.log(`➡️ Partenza buca ${currentHoleIndex + 1}`);
-            startHole(currentHoleIndex);
         } catch (err) {
-            console.error("Errore nel Next Hole:", err);
+            console.error("Errore nel Next Hole (scoreboard):", err);
             showFinalScores();
         }
     });
+
 }
 
 function showFinalScores() {
@@ -587,8 +620,8 @@ function startTournamentAdventure() {
     }
 
     // --- Generazione buche adventure ---
-    totalHolesAdventure = total;
-    currentHoleIndexAdventure = 0;
+    totalHoles = total;
+    currentHoleIndex = 0;
     holes = [];
 
     console.log("Generazione buche...");
@@ -839,25 +872,38 @@ function showAdventureShop() {
     const step = totalHolesCount === 9 ? 3 : 6;
     let difficulty = currentHoleIndex < step ? 1 : currentHoleIndex < step * 2 ? 2 : 3;
 
-    const [clubsBox, specialsBox] = populateShopDecks(statsContainer, difficulty);
-    shopContainer.appendChild(clubsBox);
-    shopContainer.appendChild(specialsBox);
+    const [shopWrapper] = populateShopDecks(statsContainer, difficulty);
+    shopContainer.appendChild(shopWrapper);
     container.appendChild(shopContainer);
 
     // --- Pulsante prossima buca ---
     const nextBtn = document.createElement('button');
     nextBtn.innerText = currentHoleIndex + 1 < holes.length ? 'Prossima buca' : 'Fine partita';
     nextBtn.classList.add('btn', 'next-hole-btn');
-    nextBtn.addEventListener('click', () => {
-        document.querySelectorAll('.shop-popup,.modal-overlay').forEach(el => el.remove());
-        if (window.activeRafId) { cancelAnimationFrame(window.activeRafId); window.activeRafId = null; }
-        let highestTimeoutId = setTimeout(";"); for (let i = 0; i < highestTimeoutId; i++) { clearTimeout(i); clearInterval(i); }
+    nextBtn.addEventListener('click', function handler() {
+        nextBtn.removeEventListener('click', handler);
+        nextBtn.disabled = true;
 
-        puttMode = false; currentGrid = null; slopeGrid = null; ball.rowZoom = null; ball.colZoom = null;
-        currentHoleIndex++;
-        if (currentHoleIndex >= holes.length) { showAdventureFinalScore(); return; }
-        startHole(currentHoleIndex);
+        console.log("➡️ NEXT HOLE CLICK");
+        console.log("currentHoleIndex:", currentHoleIndex, "totalHoles:", totalHoles);
+        console.log("activeRefs:", activeRafs.size, "activeTimers:", activeTimers.size);
+        try {
+            safeClearAllTimers();
+            safeCancelFrame();
+
+            if (currentHoleIndex + 1 < totalHoles) {
+                console.log("✅ Avvio buca", currentHoleIndex + 2);
+                startHole(currentHoleIndex + 1);
+            } else {
+                console.log("🏁 Condizione fine partita raggiunta");
+                showAdventureFinalScore();
+            }
+        } catch (err) {
+            console.error("Errore nel Next Hole (scoreboard):", err);
+            showAdventureFinalScore();
+        }
     });
+
     container.appendChild(nextBtn);
 }
 
@@ -987,11 +1033,33 @@ function createShopBoxes(clubs, specials, statsContainer) {
 
             box.appendChild(el);
         });
-
         return box;
     };
+    // crea i box
+    const clubsBox = createBox(clubs, 'club');
+    const specialsBox = createBox(specials, 'special');
 
-    return [createBox(clubs, 'club'), createBox(specials, 'special')];
+    // --- Div per mazze già possedute sotto entrambi i box ---
+    const ownedDiv = document.createElement('div');
+    ownedDiv.style.marginTop = '10px';
+    ownedDiv.style.fontSize = '0.9rem';
+    ownedDiv.style.color = '#333';
+    if (playerClubs.length > 0) {
+        ownedDiv.innerText = `Mazze già possedute: ${playerClubs.map(c => c.name).join(', ')}`;
+    } else {
+        ownedDiv.innerText = `Mazze già possedute: nessuna`;
+    }
+
+    // Wrapper con box + testo
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '5px';
+    wrapper.appendChild(clubsBox);
+    wrapper.appendChild(specialsBox);
+    wrapper.appendChild(ownedDiv);
+
+    return [wrapper]; // ora ritorni un solo elemento contenitore
 }
 
 function showAdventureFinalScore() {

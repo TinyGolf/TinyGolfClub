@@ -406,6 +406,7 @@
             ctx.strokeStyle = '#ccc';
             ctx.lineWidth = 1;
             ctx.stroke();
+            safeRequestFrame(render);
         }
 
         // --- Funzione helper aggiornata per disegnare frecce vere ---
@@ -862,7 +863,7 @@
                         i++;
                         lastTime = now;
                     }
-                    requestAnimationFrame(step);
+                    safeRequestFrame(step);
                 } else {
                     // volo finito
                     ball.col = clamp(Math.round(floatCol), 0, COLS - 1);
@@ -977,7 +978,7 @@
                     }
                 }
             }
-            requestAnimationFrame(step);
+            safeRequestFrame(step);
         }
 
         function checkHole() {
@@ -1003,7 +1004,8 @@
                                 );
                                 currentGrid = zoomGrid;
                                 slopeGrid = slopes;
-                                puttMode = false;
+                                puttMode = true;
+                                render();
                             }
                             handleHole();
                         }, 500);
@@ -1048,9 +1050,13 @@
         }
 
         // --- Putt della pallina sul green zoomato ---
+        // --- Funzione animata sicura per puttShot ---
         function puttShot(targetColZoom, targetRowZoom) {
             strokes++;
             if (strokesEl) strokesEl.innerText = strokes;
+
+            safeCancelFrame(); // cancella RAF pendenti
+            safeClearAllTimers();
 
             let posCol = ball.colZoom;
             let posRow = ball.rowZoom;
@@ -1077,57 +1083,60 @@
                         const dir = slopeGrid[r][c];
                         const influence = 0.075;
                         switch (dir) {
-    case "UP": posRow -= influence; break;
-    case "DOWN": posRow += influence; break;
-    case "LEFT": posCol -= influence; break;
-    case "RIGHT": posCol += influence; break;
-    case "UP-RIGHT":
-        posRow -= influence * Math.SQRT1_2;
-        posCol += influence * Math.SQRT1_2;
-        break;
-    case "UP-LEFT":
-        posRow -= influence * Math.SQRT1_2;
-        posCol -= influence * Math.SQRT1_2;
-        break;
-    case "DOWN-RIGHT":
-        posRow += influence * Math.SQRT1_2;
-        posCol += influence * Math.SQRT1_2;
-        break;
-    case "DOWN-LEFT":
-        posRow += influence * Math.SQRT1_2;
-        posCol -= influence * Math.SQRT1_2;
-        break;
-}
+                            case "UP": posRow -= influence; break;
+                            case "DOWN": posRow += influence; break;
+                            case "LEFT": posCol -= influence; break;
+                            case "RIGHT": posCol += influence; break;
+                            case "UP-RIGHT":
+                                posRow -= influence * Math.SQRT1_2;
+                                posCol += influence * Math.SQRT1_2;
+                                break;
+                            case "UP-LEFT":
+                                posRow -= influence * Math.SQRT1_2;
+                                posCol -= influence * Math.SQRT1_2;
+                                break;
+                            case "DOWN-RIGHT":
+                                posRow += influence * Math.SQRT1_2;
+                                posCol += influence * Math.SQRT1_2;
+                                break;
+                            case "DOWN-LEFT":
+                                posRow += influence * Math.SQRT1_2;
+                                posCol -= influence * Math.SQRT1_2;
+                                break;
+                        }
                     }
 
                     ball.rowZoom = Math.round(posRow);
                     ball.colZoom = Math.round(posCol);
                     render();
+
                     i++;
-                    setTimeout(() => requestAnimationFrame(step), 30);
+                    safeRequestFrame(step);
                 } else {
-                    // Conversione finale in coordinate globali
-                    const greenArea = getGreenArea();
-                    if (!greenArea) return;
-
-                    const scale = 3;
-                    const offsetR = Math.floor((currentGrid.length - (greenArea.maxR - greenArea.minR + 1) * scale) / 2);
-                    const offsetC = Math.floor((currentGrid[0].length - (greenArea.maxC - greenArea.minC + 1) * scale) / 2);
-
-                    // Qui assicuriamo che la buca sia solo la tile centrale
-                    const ballGlobalCol = greenArea.minC + Math.round((ball.colZoom - offsetC) / scale);
-                    const ballGlobalRow = greenArea.minR + Math.round((ball.rowZoom - offsetR) / scale);
-
-                    ball.col = ballGlobalCol;
-                    ball.row = ballGlobalRow;
-                    render();
-
-                    // Controlla se la pallina è entrata nella buca perfetta
-                    checkHole();
+                    finalizePutt();
                 }
             }
 
-            requestAnimationFrame(step);
+            safeRequestFrame(step);
+        }
+
+        // --- Funzione finale dopo il putt ---
+        function finalizePutt() {
+            const greenArea = getGreenArea();
+            if (!greenArea) return;
+
+            const scale = 3;
+            const offsetR = Math.floor((currentGrid.length - (greenArea.maxR - greenArea.minR + 1) * scale) / 2);
+            const offsetC = Math.floor((currentGrid[0].length - (greenArea.maxC - greenArea.minC + 1) * scale) / 2);
+
+            const ballGlobalCol = greenArea.minC + Math.round((ball.colZoom - offsetC) / scale);
+            const ballGlobalRow = greenArea.minR + Math.round((ball.rowZoom - offsetR) / scale);
+
+            ball.col = ballGlobalCol;
+            ball.row = ballGlobalRow;
+            render();
+
+            checkHole();
         }
         function rollBall(rollCol, rollRow, callback) {
             const rollSteps = Math.max(Math.abs(rollCol), Math.abs(rollRow), 1);
@@ -1142,7 +1151,7 @@
                     viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
                     render();
                     j++;
-                    requestAnimationFrame(rollStep);
+                    safeRequestFrame(rollStep);
                 } else {
                     // Fine rotolo
                     if (mapGrid[ball.row][ball.col] === TILE.HOLE) {
@@ -1344,5 +1353,4 @@
         populateDecks();
         render();
     }
-
 })();
