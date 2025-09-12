@@ -2,7 +2,10 @@
 (function () {
     'use strict';
     window.addEventListener('DOMContentLoaded', () => {
-
+        resetGameState();
+        initGame();
+    });
+    function initGame() {
         let viewRowStart = 40;
         // configurazione griglia (coerente con spec)
         let COLS = 20;
@@ -44,7 +47,7 @@
         function calculateDistance(r1, c1, r2, c2) {
             const dr = r2 - r1;
             const dc = c2 - c1;
-            return Math.round((Math.sqrt(dr * dr + dc * dc)-1)*10);
+            return Math.round((Math.sqrt(dr * dr + dc * dc) - 1) * 10);
         }
         function updateDistances() {
             const teePos = findTeePosition();
@@ -715,7 +718,7 @@
                         distanceFactor = 1;
                         rollFactor = 1;
                     } else {
-                        if (selectedClub.name === 'Sand' || selectedClub.name ==='Putt') {
+                        if (selectedClub.name === 'Sand' || selectedClub.name === 'Putt') {
                             distanceFactor = 1;
                             rollFactor = 1;
                         } else {
@@ -759,15 +762,13 @@
             strokes++;
             if (strokesEl) strokesEl.innerText = strokes;
 
-            // --- Differenzia modalità Adventure / Classic ---
-            const isAdventure = selectedMode === 'adventure';
-            let currentHole;
-            if (isAdventure && typeof adventureHoles !== 'undefined') {
-                if (!adventureHoles) throw new Error("adventureHoles non definito!");
-                currentHole = adventureHoles[currentHoleIndexAdventure];
-            } else {
-                currentHole = holes[currentHoleIndex];
+            // Recupera la buca attuale (vale sia per Classic che Adventure)
+            const currentHole = holes[currentHoleIndex];
+            if (!currentHole) {
+                console.error("❌ Nessuna buca valida!", { holes, currentHoleIndex });
+                return;
             }
+
             const startCol = ball.col;
             const startRow = ball.row;
             const flightTargetCol = clamp(startCol + deltaCol, 0, COLS - 1);
@@ -826,7 +827,7 @@
                     // Se NON è un water shot, applica subito la penalità
                     if (landedTile === TILE.WATER && (!selectedSpecial || selectedSpecial.name !== 'Water shot')) {
                         strokes++;
-                        holes[currentHoleIndex].strokes++; // aggiorna colpi
+                        currentHole.strokes++; // aggiorna colpi
                         ball.col = startCol;
                         ball.row = startRow;
                         viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
@@ -857,12 +858,13 @@
                     const rollCol = Math.round(Math.cos(angle) * rollDistanceAdjusted);
                     const rollRow = Math.round(Math.sin(angle) * rollDistanceAdjusted);
 
-                    // Log dettagliato volo e rotolo (decimali inclusi)
+                    // Log dettagliato volo e rotolo
                     console.log(
                         `Volo deltaCol: ${deltaCol}, deltaRow: ${deltaRow}, ` +
-                        `Rotolo calcolato rollCol: ${rollCol.toFixed(2)}, rollRow: ${rollRow.toFixed(2)}, ` +
+                        `Rotolo calcolato rollCol: ${rollCol}, rollRow: ${rollRow}, ` +
                         `rollDistanceAdjusted: ${rollDistanceAdjusted.toFixed(2)}`
                     );
+
                     // Avvia rollBall
                     if (rollCol !== 0 || rollRow !== 0) {
                         setTimeout(() => {
@@ -871,7 +873,7 @@
                                 if (mapGrid[ball.row][ball.col] === TILE.WATER) {
                                     registerLanding('water');
                                     strokes++;
-                                    holes[currentHoleIndex].strokes++; // aggiorna colpi
+                                    currentHole.strokes++;
                                     ball.col = startCol;
                                     ball.row = startRow;
                                     viewRowStart = clamp(ball.row - (VIEW_ROWS - 4), 0, ROWS_TOTAL - VIEW_ROWS);
@@ -880,21 +882,21 @@
                                     return;
                                 }
                                 updateDistances();
+
                                 // --- REGISTRA LANDING PUNTI ---
                                 const landedTile = mapGrid[ball.row][ball.col];
                                 if (landedTile === TILE.FAIRWAY) registerLanding('fairway');
                                 else if (landedTile === TILE.ROUGH) registerLanding('rough');
                                 else if (landedTile === TILE.SAND || landedTile === TILE.BUNKER) registerLanding('sand');
-                       
+
                                 // --- GREEN IN REGULATION ---
                                 if (landedTile === TILE.GREEN) {
-                                    const hole = currentHole;
-                                    if (strokes <= hole.par - 2 && !hole.hasGIR) {
+                                    if (strokes <= currentHole.par - 2 && !currentHole.hasGIR) {
                                         const bonus = 100;
-                                        if (!hole.tempPoints) hole.tempPoints = { details: [], total: 0 };
-                                        hole.tempPoints.details.push({ reason: "Green in Regulation", points: bonus });
-                                        hole.tempPoints.total += bonus;
-                                        hole.hasGIR = true; // evita duplicati
+                                        if (!currentHole.tempPoints) currentHole.tempPoints = { details: [], total: 0 };
+                                        currentHole.tempPoints.details.push({ reason: "Green in Regulation", points: bonus });
+                                        currentHole.tempPoints.total += bonus;
+                                        currentHole.hasGIR = true;
                                     }
 
                                     // entra in puttMode
@@ -911,7 +913,7 @@
                                 updateDistances();
                                 checkHole();
                             });
-                        }, 300); // pausa breve
+                        }, 300);
                     } else {
                         // Nessun rotolo
                         if (mapGrid[ball.row][ball.col] === TILE.GREEN) {
@@ -952,16 +954,16 @@
                         }, 500);
                     } else {
                         // Altrimenti entra in modalità putt/zoom sul green
-                            const area = getGreenArea();
-                            if (area) {
-                                const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(
-                                    area.minR, area.maxR, area.minC, area.maxC
-                                );
-                                currentGrid = zoomGrid;
-                                slopeGrid = slopes;
-                                puttMode = true;
-                                render();
-                            }
+                        const area = getGreenArea();
+                        if (area) {
+                            const { zoomGrid, slopeGrid: slopes } = generateZoomGridFromGreen(
+                                area.minR, area.maxR, area.minC, area.maxC
+                            );
+                            currentGrid = zoomGrid;
+                            slopeGrid = slopes;
+                            puttMode = true;
+                            render();
+                        }
                     }
                     return true;
                 }
@@ -1180,5 +1182,5 @@
         // init
         populateDecks();
         render();
-    });
+    }
 })();

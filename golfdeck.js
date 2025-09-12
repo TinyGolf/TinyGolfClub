@@ -7,7 +7,7 @@ Special cards modificano il tiro: extraDistance, curve, stopOnGreen, ecc.
 
 
 const Clubs = [
-    { num: 16, cost: 2, id: 'putt', name: 'Putt', distance: 0, roll: 2, accuracy: 1, desc: 'Per i tiri sul green' },
+    { num: 16, cost: 2, id: 'putt', name: 'Putt', distance: "0", roll: 2, accuracy: 1, desc: 'Per i tiri sul green' },
     { num: 15, cost: 4,  id: 'wedge', name: 'Wedge', distance: 3, roll: 1, accuracy: 1, desc: 'Tiro corto e preciso' },
     { num: 14, cost: 5, id: 'sand', name: 'Sand', distance: 4, roll: 1, accuracy: 1, desc: 'Utile per uscire dalla sabbia' },
     { num: 13, cost: 5, id: 'pitch', name: 'Pitch', distance: 5, roll: 1, accuracy: 1, desc: 'Tiro corto e preciso' },
