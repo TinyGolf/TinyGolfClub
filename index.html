@@ -2,107 +2,106 @@
 <html lang="it">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <title>TinyGolf - CardGame</title>
-    <link rel="stylesheet" href="golfclub.css">
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Golf Club — Mappa Interattiva</title>
+    <link rel="stylesheet" href="golfclub.css" />
 </head>
 <body>
-    <!-- Menu principale (inserisci subito dentro <body> ma fuori <main>) -->
-    <div id="mainMenu" class="menu-overlay">
-        <div class="menu-content">
-            <button id="rulesBtn" class="menu-btn">📜 Regole</button>
-
-            <h3>Numero di buche</h3>
-            <button class="menu-btn" data-holes="9">9 Buche</button>
-            <button class="menu-btn" data-holes="18">18 Buche</button>
-
-            <h3>Modalità di gioco</h3>
-            <button class="menu-btn" data-mode="classic">Classica</button>
-            <button class="menu-btn" data-mode="adventure">Avventura</button>
+    <header class="topbar">
+        <div class="hole-info">
+            <!-- Riga superiore: info buca -->
+            <div class="hole-row top-row">
+                <span class="hole-number">Buca <span id="holeNumber">1</span></span>
+                <span class="hole-par">PAR <span id="holePar">4</span></span>
+                <span class="hole-distance">Distanza: <span id="holeDistance"></span> m</span>
+                <span class="hole-shots">Colpi: <span id="holeShots">0</span></span>
+            </div>
+            <!-- Riga inferiore: controlli -->
+            <div class="hole-row bottom-row" id="hole-controls">
+                <button id="zoomInBtn">+</button>
+                <button id="zoomOutBtn">−</button>
+                <div id="windIndicator" class="wind-indicator" title="Direzione e forza del vento">
+                    <span id="windArrow">➤</span>
+                    <span id="windValue">0.0</span>
+                </div>
+                <div id="distanceTravelled" class="distance-travelled">
+                    Percorso: <span id="distanceValue">0</span> m
+                </div>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Rules Overlay -->
-    <div id="rulesMenu" class="menu-overlay" style="display:none;">
-        <div class="menu-content">
-            <h2>📜 Regole del Gioco</h2>
-            <p>
-                Benvenuto in <strong>Tiny Golf!</strong><br>
-                L'obiettivo del gioco è imbucare la pallina in <b>meno tentativi possibili</b>.
-            </p>
+    <main class="container">
+        <section class="map-area" aria-label="Mappa di gioco">
+            <canvas id="mapCanvas"></canvas>
 
-            <h3>Modalità di gioco</h3>
-            <ul>
-                <li><strong>Classica:</strong> avrai tutto sbloccato fin dall'inizio.</li>
-                <li><strong>Avventura:</strong> dovrai comprare le mazze e i colpi speciali.</li>
-            </ul>
-
-            <h3>Mazze e colpi</h3>
-            <ul>
-                <li><span style="color: #8b5a2b;"><b>Drive e Legni</b></span>: molto efficaci dal <i>Tee</i>, ma con malus se tirati da altre posizioni.</li>
-                <li><span style="color: #c0c0c0;"><b>Ferri</b></span>: abbastanza universali, senza malus particolari.</li>
-                <li><span style="color: #32bbed;"><b>Pitch, Sand e Wedge</b></span>: meno malus sul <i>rough</i>; il <b>Sand</b> non ha malus dalla sabbia.</li>
-                <li><span style="color: #1f1f1f;"><b>Putt</b></span>: ideale per tiri di avvicinamento; i colpi speciali influenzano quanto la pallina rotola.</li>
-            </ul>
-
-            <h3>Tipi di terreno</h3>
-            <ul>
-                <li><span style="color: #77b255;"><b>Fairway</b></span>: pista principale, da puntare sempre.</li>
-                <li><span style="color: #5a7a3a;"><b>Rough</b></span>: colpi con malus su potenza e rotolamento.</li>
-                <li><span style="color: #e6d6aa;"><b>Bunker</b></span>: colpo e rotolamento dimezzati.</li>
-                <li><span style="color: #5ec1ff;"><b>Acqua</b></span>: pallina persa, si ritorna al tiro precedente.</li>
-                <li><span style="color: #9be36b;"><b>Green</b></span>: obiettivo finale; rotolamento maggiore.</li>
-            </ul>
-
-            <button id="backToMenuBtn" class="menu-btn">⬅ Indietro</button>
-        </div>
-    </div>
-
-
-    <main class="app">
-        <!-- Header / scoreboard -->
-        <header class="topbar">
-            <div class="hole-info">
-                Buca <span id="holeNumber">1</span><br />
-                Par <span id="holePar">4</span>
-            </div>
-
-            <button id="camUpBtn">↑</button>
-            <button id="camDownBtn">↓</button>
-
-            <div class="strokes">
-                Colpi: <span id="strokes">0</span><br />
-                <span id="windDir">→</span> <span id="windInt">0</span>
-            </div>
-
-            <div class="distance-info">
-                Lunghezza: <span id="holeLength">0</span><br />
-                Percorso: <span id="travelledDistance">0</span>
-            </div>
-        </header>
-
-        <!-- Game map (canvas) -->
-        <section class="map-wrap">
-            <canvas id="mapCanvas" width="400" height="400" aria-label="Mappa del campo"></canvas>
-            <div class="shot-info">
-                <span id="powerDisplay">Potenza: 100%</span> |
-                <span id="rollDisplay">Rotolamento: 100%</span>
+            <!-- Controlli di movimento sui bordi del quadrato -->
+            <div class="nav-controls">
+                <button id="upBtn">↑</button>
+                <button id="downBtn">↓</button>
+                <button id="leftBtn">←</button>
+                <button id="rightBtn">→</button>
             </div>
         </section>
 
-        <!-- Card area -->
-        <section class="cards">
-            <div id="clubsDeck" class="deck horizontal-scroll"></div>
-            <div class="deck-label">Carte Speciali</div>
-            <div id="specialDeck" class="deck horizontal-scroll"></div>
+        <!-- Riga info tiro -->
+        <section id="shot-info" class="shot-info">
+            <span>Distanza: <span id="pointerDistance">0</span> m</span>
+            <span>⛳: <span id="shotPower">0%</span></span>
+            <span>🌀: <span id="shotRoll">0%</span></span>
+            <span>🎯: <span id="shotAccuracy">0%</span></span>
+        </section>
+
+        <section class="player-controls" aria-label="Controlli giocatore">
+            <div class="player-nav">
+                <div class="top">
+                    <button id="playerLU">↖</button>
+                    <button id="playerUp">⭡</button>
+                    <button id="playerRU">↗</button>
+                </div>
+                <div class="middle">
+                    <button id="playerLeft">⭠</button>
+                    <button id="playerNone"> </button>
+                    <button id="playerRight">⭢</button>
+                </div>
+                <div class="bottom">
+                    <button id="playerLD">↙</button>
+                    <button id="playerDown">⭣</button>
+                    <button id="playerRD">↘</button>
+                </div>
+            </div>
+        </section>
+        <section class="shot-controls" aria-label="Controlli tiro" style="display:none;">
+            <!-- Selezione della mazza -->
+            <div class="shot-row">
+                <label>Mazza:</label>
+                <div id="clubDeck" class="deck-container"></div>
+            </div>
+
+            <!-- Selezione tipo di tiro -->
+            <div class="shot-row">
+                <label>Tipo di tiro:</label>
+                <div id="shotDeck" class="deck-container"></div>
+            </div>
+
+
+            <!-- Pulsante per confermare il tiro -->
+            <div class="shot-row">
+                <button id="shootBtn">Tira!</button>
+            </div>
+
+            <!-- Barra dell'accuratezza -->
+            <div class="shot-row">
+                <label>Accuratezza:</label>
+                <div id="accuracyBarContainer" class="accuracy-bar">
+                    <div id="accuracyFill" class="accuracy-fill"></div>
+                </div>
+            </div>
         </section>
 
 
     </main>
-
-
     <script src="golfdeck.js"></script>
     <script src="golfclub.js"></script>
-    <script src="gamemanager.js"></script>
 </body>
 </html>

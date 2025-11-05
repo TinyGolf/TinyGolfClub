@@ -1,285 +1,347 @@
-/* --- Variabili globali --- */
 :root {
-    --bg: #d0f7d5; /* verde prato chiaro */
-    --card: #fffaf0; /* bianco crema leggero */
-    --accent: #1f8feb; /* blu accent */
-    --accent-dark: #1565c0;
-    --muted: #4b4b4b; /* grigio scuro per testo secondario */
-    --topbar-bg: rgba(255,255,255,0.85);
-    --shadow: rgba(0,0,0,0.15);
-    --tile-green: #85d183;
-    --tile-fairway: #a3e27a;
-}
-
-/* --- Reset globale --- */
-* {
-    box-sizing: border-box;
-}
-
-html, body, #mapCanvas {
-    height: 100%;
+    --bg: #f4f7f1;
+    --topbar: #0b6e4f;
+    --accent: #2d9d6f;
+    --card: #ffffff;
+    --muted: #6a6f72;
+    --fairway: #9fd08b;
+    --rough: #d7e7c8;
+    --green: #2f9e4d;
+    --bunker: #e6d0a3;
+    --tee: #ff6b6b;
 }
 
 body {
     margin: 0;
-    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto;
     background: var(--bg);
-    color: #0b1220;
+    color: #073024;
 }
 
-/* --- Overlay semi-trasparente per menu/modali --- */
-.menu-overlay, .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-}
-
-/* --- Contenitore centrale menu --- */
-/* --- Contenitore centrale menu / regole --- */
-.menu-content {
-    background: white;
-    padding: 1.5rem; /* leggermente più compatto */
-    border-radius: 12px;
-    text-align: center;
-    max-width: 320px;
-    width: 90%;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    /* Nuovi stili per regole */
-    line-height: 1.3; /* riduce interlinea generale */
-    max-height: 80vh; /* limita altezza overlay */
-    overflow-y: auto; /* scroll verticale se necessario */
-    text-align: left; /* rende le regole più leggibili */
-    padding-right: 1rem; /* per evitare che lo scroll tocchi il bordo */
-}
-
-/* --- Pulsanti menu e shop --- */
-.menu-btn, .btn, .next-hole-btn, .shop-popup button {
-    display: block;
-    width: 80%;
-    margin: 0.5rem auto;
-    padding: 8px 12px;
-    font-size: 1rem;
-    cursor: pointer;
-    border: none;
-    border-radius: 10px;
-    background: linear-gradient(145deg, #66bb6a, #43a047);
-    color: white;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-    .menu-btn:hover, .btn:hover, .next-hole-btn:hover, .shop-popup button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-
-/* --- Layout generale --- */
-.app {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-}
-
-/* --- Topbar --- */
 .topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
-    background: var(--topbar-bg);
-    border-bottom: 2px solid #cce0cc;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 2px 6px var(--shadow);
+    background: var(--topbar);
+    color: white;
+    padding: 0.5em 1em;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto;
+    font-size: 0.85rem;
 }
 
-    .topbar button {
-        background: var(--accent);
-        color: #fff;
-        border-radius: 12px;
-        padding: 6px 10px;
-        font-size: 1rem;
-        transition: all 0.2s;
+.hole-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Riga superiore */
+.top-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: white;
+}
+
+/* Riga inferiore */
+.bottom-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.hole-controls button {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(0,0,0,0.1);
+    cursor: pointer;
+}
+
+    .hole-controls button:hover {
+        background: rgba(255,255,255,1);
     }
 
-        .topbar button:hover {
-            background: var(--accent-dark);
-            transform: translateY(-2px);
-        }
+#zoomInBtn, #zoomOutBtn {
+    height: 25px;
+    width: 40px;
+    border-radius: 10px;
+    border: none;
+}
+.wind-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.15);
+    font-weight: bold;
+    font-size: 0.9rem;
+}
 
-/* --- Mappa --- */
-.map-wrap {
-    flex: 0 0 auto;
-    padding: 8px;
+.distance-travelled {
+    color: white;
+    font-weight: bold;
+    margin-left: 10px;
+    font-size: 0.9rem;
+}
+
+/* Le altre parti del CSS rimangono invariate */
+
+.container {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.map-area {
+    position: relative;
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(10,40,20,0.08);
+    overflow: hidden;
+    width: 100%;
+    max-width: 600px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
 }
 
 #mapCanvas {
     width: 100%;
-    height: auto;
-    border-radius: 16px;
-    box-shadow: 0 6px 18px var(--shadow);
-    background: linear-gradient(to bottom, #b9f29d 0%, #80e080 70%, #8ce660 100%);
+    height: 100%;
+    display: block;
 }
 
-/* --- Deck delle carte --- */
-.cards {
-    flex: 0 0 auto;
-    padding: 0 12px;
-    background: transparent;
+/* Controlli di movimento sulla mappa */
+.nav-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
-.deck-label {
-    font-weight: 600;
-    font-size: 1rem;
-    color: #2e4b2e;
-    text-align: center;
+    .nav-controls button {
+        position: absolute;
+        font-size: 20px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.9);
+        border: 1px solid rgba(0,0,0,0.1);
+        cursor: pointer;
+        pointer-events: auto;
+        transition: background 0.2s;
+    }
+
+        .nav-controls button:hover {
+            background: rgba(255,255,255,1);
+        }
+
+/* Posizionamento e dimensione personalizzata */
+#upBtn, #downBtn {
+    width: 40%; /* piï¿½ largo */
+    height: 25px; /* meno alto */
+    left: 30%; /* centrato orizzontalmente */
 }
 
-.deck.horizontal-scroll {
-    display: grid;
-    grid-auto-flow: column;
-    grid-template-rows: repeat(2, min-content);
-    gap: 10px;
-    overflow-x: auto;
-    scroll-behavior: smooth;
-    padding: 8px 0;
+#upBtn {
+    top: 5px;
 }
 
-/* --- Carte --- */
-.card {
-    min-width: 160px;
-    padding: 10px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+#downBtn {
+    bottom: 5px;
+}
+
+#leftBtn, #rightBtn {
+    width: 25px; /* piï¿½ stretto */
+    height: 40%; /* piï¿½ alto, lungo il bordo */
+    top: 30%; /* centrato verticalmente */
+}
+
+#leftBtn {
+    left: 5px;
+}
+
+#rightBtn {
+    right: 5px;
+}
+
+.shot-info {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+    .shot-info span {
+        white-space: nowrap;
+    }
+
+/* Pulsanti giocatore */
+.player-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 65px;
+}
+
+.player-nav {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: var(--card);
-    transition: transform 0.2s, box-shadow 0.2s;
+    gap: 15px;
 }
 
-    .card:hover {
-        transform: translateY(-4px) scale(1.05);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    /* Ogni riga (top, middle, bottom) ha le frecce in fila orizzontale */
+    .player-nav .top,
+    .player-nav .middle,
+    .player-nav .bottom {
+        display: flex;
+        gap: 15px;
     }
 
-    .card .title {
-        font-weight: 700;
-        font-size: 1rem;
-        text-align: center;
-    }
-
-    .card .sub, .card .desc {
-        font-size: 0.85rem;
-        text-align: center;
-    }
-
-    /* --- Colori mazze --- */
-    .card.putt {
-        background: #1f1f1f;
-        color: white;
-    }
-
-    .card.driver {
-        background: #4a4a4a;
-        color: white;
-    }
-
-    .card.wood {
-        background: #8b5a2b;
-        color: white;
-    }
-
-    .card.iron {
-        background: #c0c0c0;
-        color: black;
-    }
-
-    .card.wedge, .card.sand, .card.pitch {
-        background: #32bbed;
-        color: black;
-    }
-
-    /* --- Carte Specials --- */
-    .card.normale {
-        background: #ffffff; /* bianco */
-        color: #000000; /* testo nero */
-    }
-
-    .card.power {
-        background: #ff4c4c; /* rosso acceso */
-        color: #ffffff; /* testo bianco */
-    }
-
-    .card.spin {
-        background: #1e90ff; /* blu */
-        color: #ffffff;
-    }
-
-    .card.special {
-        background: #8a2be2; /* viola */
-        color: #ffffff;
-    }
-
-    .card.curve {
-        background: #3cb371; /* verde */
-        color: #ffffff;
-    }
-
-    /* --- Modali (Shop e Scoreboard) --- */
-    .shop-popup, .scoreboard {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: #e0ffe0;
-    border: 3px solid #4caf50;
-    border-radius: 16px;
-    padding: 16px 20px;
-    z-index: 9999;
-    font-family: 'Arial', sans-serif;
-    text-align: center;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-    min-width: 280px;
-    max-width: 90%;
+/* Stile pulsanti */
+.player-controls button {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    transition: background 0.2s;
 }
 
-    .shop-popup h2, .scoreboard h2 {
-        margin-top: 0;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    .player-controls button:hover {
+        background: #1f8d5d;
     }
 
-.score-row {
+/* Nasconde completamente il pulsante centrale vuoto */
+#playerNone {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: default;
+}
+
+/* Controlli tiro */
+.shot-controls {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
+    flex-direction: column;
+    gap: 12px;
+    padding: 8px;
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(10,40,20,0.08);
 }
 
-    .score-row div {
-        flex: 1;
-        padding: 4px;
-        margin: 0 1px;
-        background: #ffffffcc;
-        border-radius: 6px;
-        font-weight: bold;
-        color: #333;
-        font-size: 0.85rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    .shot-controls .shot-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
     }
 
-        .score-row div:last-child {
-            background: #4caf50;
-            color: white;
+    .shot-controls select,
+    .shot-controls input[type="range"],
+    .shot-controls button {
+        padding: 8px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(0,0,0,0.1);
+        font-size: 16px;
+    }
+
+    .shot-controls button {
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background 0.2s;
+    }
+
+        .shot-controls button:hover {
+            background: #1f8d5d;
         }
 
-/* --- Hint piccoli --- */
-.hint.small {
-    font-size: .82rem;
-    color: var(--muted);
-    margin-top: 8px;
+/* Deck mazze e special cards */
+.deck-container {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 4px 0;
+    scrollbar-width: none;
+}
+
+    .deck-container::-webkit-scrollbar {
+        display: none;
+    }
+
+.deck-card {
+    min-width: 100px; /* leggermente piï¿½ grande */
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    cursor: pointer;
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+    .deck-card.selected {
+        border: 2px solid var(--accent);
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    /* Figli ereditano il colore della carta */
+    .deck-card .name,
+    .deck-card .stats,
+    .deck-card .desc {
+        color: inherit;
+    }
+
+    .deck-card .name {
+        font-weight: bold;
+        font-size: 16px; /* piï¿½ grande */
+    }
+
+    .deck-card .stats {
+        font-size: 14px; /* piï¿½ leggibile */
+    }
+
+    .deck-card .desc {
+        font-size: 13px; /* leggermente piï¿½ grande */
+        font-style: italic;
+    }
+
+.accuracy-bar {
+    position: relative;
+    width: 200px;
+    height: 20px;
+    background: #333;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+}
+
+.accuracy-fill {
+    position: absolute;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #0f0, #ff0, #f00);
+    border-radius: 10px 0 0 10px;
+    transition: width 0.05s linear;
 }
