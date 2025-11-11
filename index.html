@@ -74,13 +74,11 @@
         <section class="shot-controls" aria-label="Controlli tiro" style="display:none;">
             <!-- Selezione della mazza -->
             <div class="shot-row">
-                <label>Mazza:</label>
                 <div id="clubDeck" class="deck-container"></div>
             </div>
 
             <!-- Selezione tipo di tiro -->
             <div class="shot-row">
-                <label>Tipo di tiro:</label>
                 <div id="shotDeck" class="deck-container"></div>
             </div>
 
@@ -90,13 +88,14 @@
                 <button id="shootBtn">Tira!</button>
             </div>
 
-            <!-- Barra dell'accuratezza -->
             <div class="shot-row">
-                <label>Accuratezza:</label>
                 <div id="accuracyBarContainer" class="accuracy-bar">
-                    <div id="accuracyFill" class="accuracy-fill"></div>
+                    <div id="accuracyFillRight" class="accuracy-fill-right"></div>
+                    <div id="accuracyFillLeft" class="accuracy-fill-left"></div>
+                    <div class="accuracy-center"></div>
                 </div>
             </div>
+
         </section>
 
 

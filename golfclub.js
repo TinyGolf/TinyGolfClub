@@ -49,7 +49,7 @@
 
 
     const PARS9 = [3, 3, 4, 4, 4, 4, 4, 5, 5];
-    const PAR_RANGES = { 3: [10, 14], 4: [18, 24], 5: [30, 40] };
+    const PAR_RANGES = { 3: [12, 18], 4: [22, 30], 5: [35, 45] };
 
     function createRng(seed = Math.random() * 1e9) {
         let t = seed >>> 0;
@@ -128,6 +128,20 @@
         document.getElementById("shotAccuracy").textContent = accuracy + "%";
     }
 
+    function globalToLocal(puttView, globalC, globalR) {
+        return {
+            c: (globalC - puttView.center.c) * puttView.zoom + Math.floor(puttView.grid[0].length / 2),
+            r: (globalR - puttView.center.r) * puttView.zoom + Math.floor(puttView.grid.length / 2)
+        };
+    }
+
+    function localToGlobal(puttView, localC, localR) {
+        return {
+            c: puttView.center.c + (localC - Math.floor(puttView.grid[0].length / 2)) / puttView.zoom,
+            r: puttView.center.r + (localR - Math.floor(puttView.grid.length / 2)) / puttView.zoom
+        };
+    }
+
     function markTee(grid, cols, cx, cy, val) {
         const horizontal = Math.random() < 0.5;
         if (horizontal) {
@@ -187,9 +201,9 @@
         for (let y = cy - ry - 1; y <= cy + ry + 1; y++) {
             for (let x = cx - rx - 1; x <= cx + rx + 1; x++) {
                 if (x >= 0 && y >= 0 && x < cols && y < rows) {
-                    const dx = (x - cx) / rx;
-                    const dy = (y - cy) / ry;
-                    const noise = (rng() - 0.5) * 0.4;
+                    const dx = 0.8*(x - cx) / rx;
+                    const dy = 0.8*(y - cy) / ry;
+                    const noise = (rng() - 0.5)*0.8;
 
                     // Salta se non rough o se vicino a punti protetti
                     const isProtected = protectedPoints.some(p =>
@@ -212,19 +226,19 @@
         const angleChance = rng();
         let mid;
 
-        if (angleChance < 0.4) {
+        if (angleChance < 0.25) {
             mid = {
-                c: (a.c + b.c) / 2 + (rng() - 0.5) * 30,
-                r: (a.r + b.r) / 2 + (rng() - 0.5) * 30
+                c: (a.c + b.c) / 2 + (rng() - 0.5) * 25,
+                r: (a.r + b.r) / 2 + (rng() - 0.5) * 25
             };
         } else {
             mid = {
-                c: (a.c + b.c) / 2 + (rng() - 0.5) * 8,
-                r: (a.r + b.r) / 2 + (rng() - 0.5) * 8
+                c: (a.c + b.c) / 2 + (rng() - 0.5) * 12,
+                r: (a.r + b.r) / 2 + (rng() - 0.5) * 12
             };
         }
 
-        const startPixels = 2 + Math.floor(rng() * 2);
+        const startPixels = 4 + Math.floor(rng() * 2);
         const endPixels = 2 + Math.floor(rng() * 2);
 
         for (let i = 0; i <= steps; i++) {
@@ -294,14 +308,13 @@
             { name: "W", dx: -1, dy: 0 },
             { name: "NW", dx: -0.7, dy: -0.7 }
         ];
-
         const getDirIndex = name => directions.findIndex(d => d.name === name);
 
         let holes = [];
         let tempCoords = [];
-
         let cur = { c: 0, r: 0 };
 
+        // --- Generazione tee e green per ogni buca ---
         for (let i = 0; i < holeCount; i++) {
             const par = PARS[i];
             const [minL, maxL] = PAR_RANGES[par];
@@ -338,7 +351,6 @@
 
             } while (
                 tempCoords.some(p =>
-                    // estendi la zona di controllo a ±2 per il tee e ±3 per il green
                     (Math.abs(p.c - tee.c) <= 5 && Math.abs(p.r - tee.r) <= 5) ||
                     (Math.abs(p.c - green.c) <= 8 && Math.abs(p.r - green.r) <= 8)
                 )
@@ -351,6 +363,7 @@
             cur = { c: green.c + Math.round(dir.dx * 6), r: green.r + Math.round(dir.dy * 6) };
         }
 
+        // --- Calcolo dimensioni griglia ---
         const margin = 10;
         const minC = Math.min(...tempCoords.map(p => p.c));
         const maxC = Math.max(...tempCoords.map(p => p.c));
@@ -359,7 +372,7 @@
         const cols = maxC - minC + 1 + margin * 2;
         const rows = maxR - minR + 1 + margin * 2;
 
-
+        // --- Normalizza le coordinate delle buche e tee ---
         for (let h of holes) {
             h.tee.c = h.tee.c - minC + margin;
             h.tee.r = h.tee.r - minR + margin;
@@ -367,6 +380,7 @@
             h.holePos.r = h.holePos.r - minR + margin;
         }
 
+        // --- Inizializza griglia ---
         const grid = new Uint8Array(cols * rows).fill(LAYERS.ROUGH);
 
         // --- Aggiungi acqua ---
@@ -377,14 +391,9 @@
             const rx = 3 + Math.floor(rng() * 3);
             const ry = 2 + Math.floor(rng() * 2);
 
-            // Proteggi tutti i tee, green e bunker esistenti finora
             const protectedPoints = [];
-
             for (let h of holes) {
-                // Protezione tee: solo la cella del tee
                 protectedPoints.push({ c: h.tee.c, r: h.tee.r });
-
-                // Protezione buca: 3x3 intorno alla cella della buca
                 for (let dy = -1; dy <= 1; dy++) {
                     for (let dx = -1; dx <= 1; dx++) {
                         protectedPoints.push({ c: h.holePos.c + dx, r: h.holePos.r + dy });
@@ -392,26 +401,38 @@
                 }
             }
 
-            // Bunker non ancora creati qui, quindi opzionale
             markWater(grid, cols, wx, wy, rx, ry, rng, protectedPoints);
         }
 
+        // --- Costruzione green, tee, fairway, bunker e altezze ---
         for (let h of holes) {
-            markTee(grid, cols, h.tee.c, h.tee.r, LAYERS.TEE); // tee non usa rng
+            // Tee
+            markTee(grid, cols, h.tee.c, h.tee.r, LAYERS.TEE);
+
+            // Green
             const rx = 3 + Math.round(rng() * 2);
             const ry = 3 + Math.round(rng() * 2);
             markEllipticalGreen(grid, cols, h.holePos.c, h.holePos.r, rx, ry, LAYERS.GREEN, rng);
-            carveCurvedLine(grid, cols, h.tee, h.holePos, 2 + Math.floor(rng() * 2), LAYERS.FAIRWAY, rng);
 
+            // Fairway
+            carveCurvedLine(grid, cols, h.tee, h.holePos, 2 + Math.floor(rng() * 2.5), LAYERS.FAIRWAY, rng);
+
+            // --- Genera le altezze del green una sola volta per la buca ---
+            const greenSizeRows = ry * 2 + 1;
+            const greenSizeCols = rx * 2 + 1;
+            h.greenHeights = generateGreenHeights(greenSizeRows, greenSizeCols, 0.5);
+
+            // Bunker
             const bunkerCount = 1 + Math.floor(rng() * 3);
             for (let b = 0; b < bunkerCount; b++) {
                 const ang = rng() * Math.PI * 2;
-                const dist = 3 + rng() * 4;
+                const dist = 2 + rng() * 4;
                 const bx = Math.round(h.holePos.c + Math.cos(ang) * dist);
                 const by = Math.round(h.holePos.r + Math.sin(ang) * dist);
                 markCircle(grid, cols, bx, by, 2, LAYERS.BUNKER, rng);
             }
 
+            // Buca
             grid[h.holePos.r * cols + h.holePos.c] = LAYERS.HOLE;
         }
 
@@ -449,10 +470,9 @@
         const ballC = Math.round(gameState.ball.c);
         const ballR = Math.round(gameState.ball.r);
 
-        // 🔍 Trova la buca più vicina alla pallina
+        // trova la buca più vicina
         let closestHole = currentMap.holes[0];
         let minDist = Infinity;
-
         for (const hole of currentMap.holes) {
             const dx = hole.holePos.c - ballC;
             const dy = hole.holePos.r - ballR;
@@ -470,47 +490,85 @@
 
         console.log(`⛳ Modalità PUTT attivata per buca ${closestHole.number}`);
 
-        // === 🗺️ Ora genera la mini mappa zoomata attorno alla buca ===
         const holeC = closestHole.holePos.c;
         const holeR = closestHole.holePos.r;
-
-        const radius = 10; // puoi regolare quanto grande sarà la zona del green
+        const radius = 10; // 21x21 tiles base
         const tiles = [];
 
+        // estrai le tile dalla mappa
         for (let r = -radius; r <= radius; r++) {
             const row = [];
             for (let c = -radius; c <= radius; c++) {
                 const srcC = holeC + c;
                 const srcR = holeR + r;
-
-                if (
-                    srcC >= 0 && srcC < currentMap.cols &&
-                    srcR >= 0 && srcR < currentMap.rows
-                ) {
+                if (srcC >= 0 && srcC < currentMap.cols && srcR >= 0 && srcR < currentMap.rows) {
                     const layer = currentMap.grid[srcR * currentMap.cols + srcC];
                     row.push(layer);
                 } else {
-                    row.push(LAYERS.ROUGH); // fuori mappa → rough
+                    row.push(LAYERS.ROUGH);
                 }
             }
             tiles.push(row);
         }
 
-        // 🟩 Costruisci la mini mappa espansa (zoomata ×3)
         const zoom = 3;
         const tileSize = 18;
         const zoomedTiles = expandTileGrid(tiles, zoom);
-        const heightMap = generateGreenHeights(zoomedTiles.length, zoomedTiles[0].length);
-        // Salva la mappa zoomata come nuovo contesto temporaneo
+
+        const zoomRows = zoomedTiles.length;
+        const zoomCols = zoomedTiles[0].length;
+
+        // --- genera heightMap per tutta la mini-mappa zoomata ---
+        const greenHeights = closestHole.greenHeights;
+        const greenRows = greenHeights.length;
+        const greenCols = greenHeights[0].length;
+
+        const centerR = Math.floor(zoomRows / 2);
+        const centerC = Math.floor(zoomCols / 2);
+
+        const heightMap = Array.from({ length: zoomRows }, (_, r) =>
+            Array.from({ length: zoomCols }, (_, c) => {
+                // distanza dal centro della mini-mappa
+                const dr = r - centerR;
+                const dc = c - centerC;
+
+                // coord nel green originale
+                const ghR = Math.floor(dr / zoom + greenRows / 2);
+                const ghC = Math.floor(dc / zoom + greenCols / 2);
+
+                if (ghR >= 0 && ghR < greenRows && ghC >= 0 && ghC < greenCols) {
+                    // dentro il green: altezza reale
+                    return greenHeights[ghR][ghC];
+                } else {
+                    // fuori green: piccolo gradiente casuale/fairway
+                    return (Math.random() - 0.5) * 0.2;
+                }
+            })
+        );
+
+        // assegna puttView
         gameState.puttView = {
             grid: zoomedTiles,
             heights: heightMap,
             center: { c: holeC, r: holeR },
             zoom,
             tileSize,
-            offset: { x: 0, y: 0 } // per movimenti futuri
+            offset: { x: 0, y: 0 }
         };
 
+        // ✅ converti globali in locali SOLO se non esistono già
+        if (!gameState.ball.local) {
+            gameState.ball.local = globalToLocal(gameState.puttView, gameState.ball.c, gameState.ball.r);
+        }
+        if (!gameState.player.local) {
+            gameState.player.local = globalToLocal(gameState.puttView, gameState.player.c, gameState.player.r);
+        }
+        if (!gameState.puttView.localHole) {
+            gameState.puttView.localHole = globalToLocal(gameState.puttView, closestHole.holePos.c, closestHole.holePos.r);
+        }
+
+        // imposta modalità e UI
+        updateControlsUI();
         renderPuttView(gameState.puttView);
         startPuttLoop();
     }
@@ -523,21 +581,44 @@
         render(); // torna a disegnare la mappa normale
     }
 
-    function generateGreenHeights(rows, cols) {
+    function generateGreenHeights(rows, cols, amplitude = 1, centerCount = 8, maxCenterHeight = 1, maxRadius = 8) {
         const heights = new Array(rows).fill(0).map(() => new Array(cols).fill(0));
 
-        // generazione “smooth random” (senza librerie)
-        const smooth = 4; // più alto = più morbido
+        const smooth = 4; // più alto = più morbido base
+        // --- base sinusoidale semplice
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                // base casuale con morbidezza
-                const val =
-                    (Math.sin(r / smooth) + Math.cos(c / smooth) + Math.random() * 0.3) / 2;
+                const val = (Math.sin(r / smooth) + Math.cos(c / smooth) + Math.random() * 0.3) / 2;
                 heights[r][c] = val;
             }
         }
 
-        // normalizza tra -1 e +1
+        // --- Genera centri casuali di pendenza ---
+        for (let i = 0; i < centerCount; i++) {
+            const centerR = Math.floor(Math.random() * rows);
+            const centerC = Math.floor(Math.random() * cols);
+            const radius = 2 + Math.random() * maxRadius; // raggio casuale
+            const height = (Math.random() * 2 - 1) * maxCenterHeight; // altezza casuale
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const dr = r - centerR;
+                    const dc = c - centerC;
+                    let dist = Math.hypot(dr, dc);
+
+                    if (dist <= radius) {
+                        // aggiungi un falloff morbido tipo coseno
+                        let t = dist / radius;
+                        let falloff = Math.cos(t * Math.PI / 2); // più naturale
+                        // aggiungi un piccolo noise per rendere la forma irregolare
+                        const noise = (Math.random() - 0.5) * 0.3;
+                        heights[r][c] += height * falloff + noise * amplitude;
+                    }
+                }
+            }
+        }
+
+        // --- normalizza tra -1 e +1 e applica amplitude ---
         let min = Infinity, max = -Infinity;
         for (const row of heights) {
             for (const v of row) {
@@ -545,10 +626,10 @@
                 max = Math.max(max, v);
             }
         }
-        const range = max - min;
+        const range = max - min || 1;
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                heights[r][c] = ((heights[r][c] - min) / range) * 2 - 1;
+                heights[r][c] = (((heights[r][c] - min) / range) * 2 - 1) * amplitude;
             }
         }
 
@@ -616,6 +697,7 @@
         }
 
         // --- Disegna le frecce di pendenza ---
+        // --- Disegna le frecce di pendenza ---
         if (puttView.heights) {
             ctx.save();
             ctx.strokeStyle = "rgba(255,0,0,0.4)";
@@ -630,38 +712,41 @@
                     const hD = puttView.heights[r + 1][c];
                     if ([hL, hR, hU, hD].some(h => h === undefined)) continue;
 
-                    // Calcola gradiente (pendenza)
+                    // Gradiente
                     const gx = (hR - hL) / 2;
                     const gy = (hD - hU) / 2;
                     const mag = Math.sqrt(gx * gx + gy * gy);
-                    if (mag < 0.05) continue; // troppo piano, non disegnare
+                    if (mag < 0.05) continue;
 
-                    // Direzione della freccia (verso valle)
-                    const nx = 1.4 * gx / mag;
-                    const ny = 1.4 * gy / mag;
+                    // Direzione normalizzata
+                    const nx = gx / mag;
+                    const ny = gy / mag;
 
                     const cx = offsetX + (c + 0.5) * tileSize;
                     const cy = offsetY + (r + 0.5) * tileSize;
-                    const len = tileSize * Math.min(0.6, mag * 3);
 
-                    // Freccia principale
+                    const arrowLength = tileSize * Math.min(1.2, mag * 12); // lunghezza totale
+                    const tipLength = tileSize * 0.4; // punta corta
+                    const tailLength = arrowLength - tipLength; // lunghezza coda
+
+                    // --- Linea freccia (coda → punta) ---
                     ctx.beginPath();
-                    ctx.moveTo(cx, cy);
-                    ctx.lineTo(cx + nx * len, cy + ny * len);
+                    ctx.moveTo(cx - nx * tailLength, cy - ny * tailLength); // inizio coda
+                    ctx.lineTo(cx + nx * tipLength, cy + ny * tipLength);    // punta
                     ctx.stroke();
 
-                    // Punta freccia
+                    // --- Punta della freccia ---
                     const angle = Math.atan2(ny, nx);
                     const headSize = 7 + mag * 2;
                     ctx.beginPath();
-                    ctx.moveTo(cx + nx * len, cy + ny * len);
+                    ctx.moveTo(cx + nx * tipLength, cy + ny * tipLength);
                     ctx.lineTo(
-                        cx + nx * len - Math.cos(angle - Math.PI / 6) * headSize,
-                        cy + ny * len - Math.sin(angle - Math.PI / 6) * headSize
+                        cx + nx * tipLength - Math.cos(angle - Math.PI / 6) * headSize,
+                        cy + ny * tipLength - Math.sin(angle - Math.PI / 6) * headSize
                     );
                     ctx.lineTo(
-                        cx + nx * len - Math.cos(angle + Math.PI / 6) * headSize,
-                        cy + ny * len - Math.sin(angle + Math.PI / 6) * headSize
+                        cx + nx * tipLength - Math.cos(angle + Math.PI / 6) * headSize,
+                        cy + ny * tipLength - Math.sin(angle + Math.PI / 6) * headSize
                     );
                     ctx.closePath();
                     ctx.fill();
@@ -688,50 +773,119 @@
         const dy = Math.round(gameState.ball.r - puttView.center.r);
         const px = centerC + dx * puttView.zoom;
         const py = centerR + dy * puttView.zoom;
-
         // --- Disegna la pallina ---
-        ctx.beginPath();
-        ctx.arc(
-            offsetX + (px + 0.5) * tileSize,
-            offsetY + (py + 0.5) * tileSize,
-            tileSize * 0.25,
-            0,
-            Math.PI * 2
-        );
-        ctx.fillStyle = "white";
-        ctx.fill();
-        ctx.strokeStyle = "#333";
-        ctx.stroke();
+        const ballLocal = gameState.ball.local;
+        if (ballLocal) {
+            ctx.beginPath();
+            ctx.arc(
+                offsetX + (ballLocal.c + 0.5) * tileSize,
+                offsetY + (ballLocal.r + 0.5) * tileSize,
+                tileSize * 0.25,
+                0,
+                Math.PI * 2
+            );
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.strokeStyle = "#333";
+            ctx.stroke();
+        }
 
-        // --- Disegna il giocatore se è vicino ---
-        const pdx = Math.round(gameState.player.c - puttView.center.c);
-        const pdy = Math.round(gameState.player.r - puttView.center.r);
-        const pc = centerC + pdx * puttView.zoom;
-        const pr = centerR + pdy * puttView.zoom;
+        // --- Disegna il giocatore sul green (stile mappa generale) ---
+        if (gameState.player) {
+            const pdx = gameState.player.c - puttView.center.c;
+            const pdy = gameState.player.r - puttView.center.r;
 
-        ctx.fillStyle = "#ff4444";
-        ctx.beginPath();
-        ctx.arc(
-            offsetX + (pc + 0.5) * tileSize,
-            offsetY + (pr + 0.5) * tileSize,
-            tileSize * 0.3,
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
+            // Coordinate in celle zoomate
+            const px = centerC + pdx * puttView.zoom + 0.5;
+            const pyFeet = centerR + pdy * puttView.zoom + 0.5;
+
+            const cellPx = puttView.tileSize;
+
+            ctx.lineWidth = Math.max(1, cellPx * 0.08);
+
+            // --- Tile superiore: testa ---
+            const headRadius = cellPx * 0.4;
+            const headY = (pyFeet - 1.5) * cellPx; // centro testa nella tile più alta
+            ctx.beginPath();
+            ctx.arc(offsetX + px * cellPx, offsetY + headY, headRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "black";
+            ctx.fill();
+
+            // --- Tronco e braccia ---
+            const bodyTopY = (pyFeet - 1 - 0.1) * cellPx;   // parte superiore corpo
+            const bodyBottomY = (pyFeet - 0.4) * cellPx;    // parte inferiore corpo
+
+            // Tronco
+            ctx.beginPath();
+            ctx.moveTo(offsetX + px * cellPx, offsetY + bodyTopY);
+            ctx.lineTo(offsetX + px * cellPx, offsetY + bodyBottomY);
+            ctx.strokeStyle = "blue";
+            ctx.stroke();
+
+            // Braccia a metà corpo
+            ctx.beginPath();
+            ctx.moveTo(offsetX + px * cellPx - cellPx * 0.3, offsetY + (bodyTopY + bodyBottomY) / 2);
+            ctx.lineTo(offsetX + px * cellPx + cellPx * 0.3, offsetY + (bodyTopY + bodyBottomY) / 2);
+            ctx.stroke();
+
+            // --- Gambe ---
+            const legExtra = cellPx * 0.3; // lunghezza gambe
+            // Gamba sinistra
+            ctx.beginPath();
+            ctx.moveTo(offsetX + px * cellPx, offsetY + bodyBottomY);
+            ctx.lineTo(offsetX + px * cellPx - cellPx * 0.25, offsetY + pyFeet * cellPx + legExtra);
+            ctx.stroke();
+
+            // Gamba destra
+            ctx.beginPath();
+            ctx.moveTo(offsetX + px * cellPx, offsetY + bodyBottomY);
+            ctx.lineTo(offsetX + px * cellPx + cellPx * 0.25, offsetY + pyFeet * cellPx + legExtra);
+            ctx.stroke();
+        }
+
+        // --- LINEA DEL TIRO (coordinate locali corrette) ---
+        if (puttTarget && gameState.ball.local) {
+            const cellPx = puttView.tileSize || 18;
+
+            // Posizione palla in celle locali
+            const ballC = gameState.ball.local.c;
+            const ballR = gameState.ball.local.r;
+
+            // Posizione target in celle locali
+            const targetC = puttTarget.c;
+            const targetR = puttTarget.r;
+
+            // Converti entrambe in pixel, usando offset per centrare la mappa
+            const ballX = offsetX + (ballC +0.5) * cellPx;
+            const ballY = offsetY + (ballR +0.5) * cellPx;
+            const targetX = offsetX + (targetC) * cellPx;
+            const targetY = offsetY + (targetR) * cellPx;
+
+            // Disegna la linea rossa del tiro
+            ctx.strokeStyle = "red";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ballX, ballY);
+            ctx.lineTo(targetX, targetY);
+            ctx.stroke();
+        }
+
     }
 
     /* Helper per schiarire/scurire colori in base all'altimetria */
     function shadeTileColor(color, amount) {
         try {
             const num = parseInt(color.replace("#", ""), 16);
-            let r = (num >> 16) + amount;
-            let g = ((num >> 8) & 0x00FF) + amount;
-            let b = (num & 0x0000FF) + amount;
-            r = Math.min(255, Math.max(0, r));
-            g = Math.min(255, Math.max(0, g));
-            b = Math.min(255, Math.max(0, b));
-            return `rgb(${r},${g},${b})`;
+            let r = (num >> 16) & 0xFF;
+            let g = (num >> 8) & 0xFF;
+            let b = num & 0xFF;
+
+            // moduliamo i canali in base ad "amount" (pendenza)
+            r = Math.min(255, Math.max(0, r + amount));      // rosso meno dominante
+            g = Math.min(255, Math.max(0, g + amount*1.5));            // verde più sensibile
+            b = Math.min(255, Math.max(0, b + amount * 1.2));      // blu leggermente più alto per effetto rilievo
+
+            return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
         } catch {
             return color;
         }
@@ -829,36 +983,35 @@
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(
-                (gameState.ball.c - view.x + 0.5) * cellPx,
-                (gameState.ball.r - view.y + 0.5) * cellPx
+                (gameState.ball.c - view.x +0.5) * cellPx,
+                (gameState.ball.r - view.y +0.5) * cellPx
             );
             ctx.lineTo(
-                (shotTarget.c - view.x + 0.5) * cellPx,
-                (shotTarget.r - view.y + 0.5) * cellPx
+                (shotTarget.c - view.x) * cellPx,
+                (shotTarget.r - view.y) * cellPx
             );
             ctx.stroke();
 
-            // === CERCHIO DI PRECISIONE ===
+            // --- CERCHIO DI PRECISIONE ---
             const selectedClubObj = Clubs.find(c => c.name === selectedClub?.name);
 
-            if (selectedClubObj) {
+            if (selectedClubObj && shotTarget) {
                 const baseDistance = selectedClubObj.distance;
                 const accuracy = selectedClubObj.accuracy;
 
-                // Seleziona il valore dello slider di potenza (accuratezza)
+                // Valore della barra di accuracy
                 const slider = document.getElementById("accuracyRange");
-                const powerFactor = slider ? slider.value / 100 : 1;
+                const barValue = slider ? slider.value : 50; // default 50
+                const normBar = barValue / 100;
+                const precisionFactor = getAccuracyFromBar(normBar);
 
-                // Il tiro più forte aumenta leggermente la dispersione
-                const adjustedAccuracy = accuracy * (0.9 + 0.1 * powerFactor);
-
-                // Raggio d'errore in celle (più alto = meno preciso)
-                const errorRadius = baseDistance * (1 - adjustedAccuracy);
+                // Raggio d'errore in celle
+                const errorRadius = baseDistance * (1 - accuracy * precisionFactor);
 
                 // Converti in pixel
                 const errorRadiusPx = errorRadius * cellPx;
 
-                // Colore dinamico (verde = preciso, rosso = impreciso)
+                // Colore
                 let color = "rgba(255,100,100,0.5)";
 
                 // Disegna cerchio centrato sul punto di destinazione
@@ -867,8 +1020,8 @@
                 ctx.fillStyle = color.replace("0.4", "0.15");
                 ctx.lineWidth = 2;
                 ctx.arc(
-                    (shotTarget.c - view.x + 0.5) * cellPx,
-                    (shotTarget.r - view.y + 0.5) * cellPx,
+                    (shotTarget.c - view.x) * cellPx,
+                    (shotTarget.r - view.y) * cellPx,
                     errorRadiusPx,
                     0,
                     Math.PI * 2
@@ -876,6 +1029,7 @@
                 ctx.fill();
                 ctx.stroke();
             }
+
         }
 
         const px = gameState.player.c - view.x + 0.5;
@@ -999,7 +1153,7 @@
 
     // Controllo camera libera (freccette)
     function moveView(dx, dy) {
-        if (gameState.mode === "putt" && gameState.puttView) {
+        if ((gameState.mode === "putt" || gameState.mode === "puttmove") && gameState.puttView) {
             // 🔍 Muovi la vista del putt
             const pv = gameState.puttView;
             if (!pv.offset) pv.offset = { x: 0, y: 0 };
@@ -1033,75 +1187,216 @@
     }
 
     function updateControlsUI() {
+        stopAccuracyBar();
         if (gameState.mode === "player") {
-            playerControls.style.display = "flex";   // mostra frecce movimento
-            shotControls.style.display = "none";     // nascondi controlli tiro
+            playerControls.style.display = "flex";
+            shotControls.style.display = "none";
+            updateWind();
+
         } else if (gameState.mode === "shot") {
-            playerControls.style.display = "none";   // nascondi frecce
-            shotControls.style.display = "flex";     // mostra controlli tiro
+            playerControls.style.display = "none";
+            shotControls.style.display = "flex";
+
+            // Mostra tutte le tessere e i bottoni di tiro
+            document.querySelectorAll("#clubDeck, #shotDeck").forEach(el => el.style.display = "flex");
+            document.querySelectorAll("#shootBtn, #accuracyBarContainer").forEach(el => el.style.display = "flex");
+
             startAccuracyBar();
+            updateHoleHUD();
+
         } else if (gameState.mode === "putt") {
-            playerControls.style.display = "none";   // nascondi frecce
-            shotControls.style.display = "flex";     // nascondi controlli tiro
+            playerControls.style.display = "none";
+            shotControls.style.display = "flex";
+
+            // Nascondi tessere mazze, mostra solo tiro e barra accuracy
+            document.querySelectorAll("#clubDeck, #shotDeck").forEach(el => el.style.display = "none");
+            document.querySelectorAll("#shootBtn, #accuracyBarContainer").forEach(el => el.style.display = "block");
+
+            // Avvia la barra solo se la palla NON si sta muovendo
+            if (!gameState.ball.moving) {
+                startAccuracyBar();
             }
+
+        } else if (gameState.mode === "puttmove") {
+            // Mostra frecce movimento sul green
+            playerControls.style.display = "flex";
+
+            // Nascondi controlli tiro
+            shotControls.style.display = "none";
+
+            // La visuale resta zoomata sul green
+        }
     }
 
     // Movimento giocatore
     function movePlayer(dc, dr) {
-        if (gameState.mode !== "player") return;
+        if (gameState.mode !== "player" && gameState.mode !== "puttmove") return;
 
-        const newC = gameState.player.c + dc;
-        const newR = gameState.player.r + dr;
+        let newC = gameState.player.c + dc;
+        let newR = gameState.player.r + dr;
 
-        // Blocca ai bordi
-        if (newC < 0 || newC >= currentMap.cols) return;
-        if (newR < 0 || newR >= currentMap.rows) return;
+        if (gameState.mode === "puttmove" && gameState.puttView) {
+            const pv = gameState.puttView;
+            let newLocalC = (gameState.player.local?.c || 0) + dc;
+            let newLocalR = (gameState.player.local?.r || 0) + dr;
 
-        // Muove il giocatore
-        gameState.player.c = newC;
-        gameState.player.r = newR;
+            // Limita all’interno del green
+            if (newLocalC < 0 || newLocalC >= pv.grid[0].length) return;
+            if (newLocalR < 0 || newLocalR >= pv.grid.length) return;
 
-        // 🔍 Controlla se il giocatore raggiunge la palla
-        if (newC === Math.round(gameState.ball.c) && newR === Math.round(gameState.ball.r)) {
-            // Controlla il tipo di tile sotto la palla
-            const tileType = getTileTypeAt(newC, newR);
+            // Aggiorna posizione locale
+            gameState.player.local.c = newLocalC;
+            gameState.player.local.r = newLocalR;
 
-            if (tileType === "green") {
-                // Se è green, entra in modalità putt con mappa zoomata
-                console.log("⛳ Entrata nel green → modalità PUTT attivata!");
+            // Aggiorna coordinate globali
+            const global = localToGlobal(pv, newLocalC, newLocalR);
+            newC = gameState.player.c = global.c;
+            newR = gameState.player.r = global.r;
+
+            // --- CONTROLLO SE IL GIOCATORE È SULLA PALLINA ---
+            const ballLocal = gameState.ball.local;
+            if (ballLocal && newLocalC === Math.round(ballLocal.c) && newLocalR === Math.round(ballLocal.r)) {
+                console.log("⛳ Giocatore ha raggiunto la pallina → modalità PUTT");
                 gameState.mode = "putt";
                 updateControlsUI();
-                enterPuttView(); // 👈 funzione che genera e mostra la mappa zoomata
-            } else {
-                // Altrimenti, modalità tiro normale
-                console.log("🏌️ Modalità Tiro normale attivata");
-                gameState.mode = "shot";
+            }
+
+            // --- CONTROLLO FINE BUCA ---
+            const hole = pv.localHole;
+            if (ballLocal && hole &&
+                Math.round(ballLocal.c) === Math.round(hole.c) &&
+                Math.round(ballLocal.r) === Math.round(hole.r) &&
+                newLocalC === Math.round(ballLocal.c) &&
+                newLocalR === Math.round(ballLocal.r)
+            ) {
+                console.log("🏁 Palla imbucata! Passaggio alla buca successiva");
+
+                // Salva colpi della buca corrente
+                if (!gameState.shotsTotal) gameState.shotsTotal = [];
+                gameState.shotsTotal[currentHoleIndex] = holeShots;
+                console.log(`🏌️ Colpi buca ${currentHoleIndex + 1}: ${holeShots}`);
+
+                // Reset variabili green/putt
+                gameState.mode = "player";
+                gameState.puttView = null;
+                gameState.player.local = null;
+                gameState.ball.local = null;
+
                 updateControlsUI();
+                render(); // torna alla mappa generale
+
+                // Passa alla buca successiva
+                currentHoleIndex++;
+                if (currentHoleIndex >= gameHoles.length) currentHoleIndex = 0;
+                const nextHole = gameHoles[currentHoleIndex];
+                if (nextHole) {
+                    // Posiziona pallina sul tee della nuova buca
+                    gameState.ball.c = nextHole.tee.c;
+                    gameState.ball.r = nextHole.tee.r;
+                    holeShots = 0; // reset colpi per la nuova buca
+                    console.log(`🏌️ Pallina spostata al tee della buca ${nextHole.number}`);
+                }
+                return; // esce per non processare altro
+            }
+
+            renderPuttView(pv);
+        } else {
+            // Movimento normale sulla mappa generale
+            if (newC < 0 || newC >= currentMap.cols) return;
+            if (newR < 0 || newR >= currentMap.rows) return;
+
+            gameState.player.c = newC;
+            gameState.player.r = newR;
+
+            // Aggiorna la camera a seguire
+            if (!gameState.followingPlayer) {
+                gameState.followingPlayer = true;
+                const follow = () => {
+                    if (!gameState.followingPlayer) return;
+                    const targetX = gameState.player.c - view.size / 2;
+                    const targetY = gameState.player.r - view.size / 2;
+                    const lerpFactor = 0.15;
+                    view.x += (targetX - view.x) * lerpFactor;
+                    view.y += (targetY - view.y) * lerpFactor;
+                    render();
+                    if (Math.abs(targetX - view.x) > 0.05 || Math.abs(targetY - view.y) > 0.05) {
+                        requestAnimationFrame(follow);
+                    } else {
+                        gameState.followingPlayer = false;
+                    }
+                };
+                requestAnimationFrame(follow);
             }
         }
 
-        // === 📸 Camera segue il giocatore ===
-        if (!gameState.followingPlayer) {
-            gameState.followingPlayer = true;
-            const follow = () => {
-                if (!gameState.followingPlayer) return;
+        const ballC = Math.round(gameState.ball.c);
+        const ballR = Math.round(gameState.ball.r);
 
-                const targetX = gameState.player.c - view.size / 2;
-                const targetY = gameState.player.r - view.size / 2;
-                const lerpFactor = 0.15;
+        // --- Solo se siamo in modalità player normale ---
+        if (gameState.mode === "player" && newC === ballC && newR === ballR) {
+            const holePos = gameHoles[currentHoleIndex].holePos;
+            const tileType = getTileTypeAt(ballC, ballR);
 
-                view.x += (targetX - view.x) * lerpFactor;
-                view.y += (targetY - view.y) * lerpFactor;
+            // Controllo speciale: pallina sulla buca
+            if (ballC === holePos.c && ballR === holePos.r) {
+                console.log("🎯 Pallina sulla buca (fuori dal green)!");
+                const chance = Math.random();
 
-                render();
+                if (chance <= 0.15) {
+                    // ✅ 15% imbucata
+                    console.log("🏁 Colpo fortunato! Palla imbucata!");
+                    if (!gameState.shotsTotal) gameState.shotsTotal = [];
+                    gameState.shotsTotal[currentHoleIndex] = holeShots;
 
-                if (Math.abs(targetX - view.x) > 0.05 || Math.abs(targetY - view.y) > 0.05) {
-                    requestAnimationFrame(follow);
+                    // Reset variabili
+                    gameState.mode = "player";
+                    gameState.puttView = null;
+                    if (gameState.player.local) gameState.player.local = null;
+                    if (gameState.ball.local) gameState.ball.local = null;
+
+                    updateControlsUI();
+                    render();
+
+                    // Passa alla buca successiva
+                    currentHoleIndex++;
+                    if (currentHoleIndex >= gameHoles.length) currentHoleIndex = 0;
+                    const nextHole = gameHoles[currentHoleIndex];
+                    if (nextHole) {
+                        gameState.ball.c = nextHole.tee.c;
+                        gameState.ball.r = nextHole.tee.r;
+                        holeShots = 0;
+                        console.log(`🏌️ Pallina spostata al tee della buca ${nextHole.number}`);
+                    }
+                    return;
+
                 } else {
-                    gameState.followingPlayer = false;
+                    // ❌ 85% → palla vicino alla buca
+                    console.log("😅 Colpo sfortunato! La palla resta vicino alla buca...");
+                    const offsets = [
+                        [-1, -1], [0, -1], [1, -1],
+                        [-1, 0], [1, 0],
+                        [-1, 1], [0, 1], [1, 1]
+                    ];
+                    const choice = offsets[Math.floor(Math.random() * offsets.length)];
+                    gameState.ball.c = ballC + choice[0];
+                    gameState.ball.r = ballR + choice[1];
+
+                    render();
+                    // Resta in modalità PLAYER: il giocatore deve muoversi verso la pallina
+                    return; // molto importante, esce qui per non attivare subito la modalità putt
                 }
-            };
-            requestAnimationFrame(follow);
+            }
+
+            // Gestione normale green / shot SOLO se la pallina non era sulla buca
+            if (tileType === "green") {
+                gameState.mode = "putt";
+                enterPuttView();
+            } else if (tileType !== "hole") {
+                gameState.mode = "shot";
+            }
+
+            updateControlsUI();
+            console.log(`ℹ️ Giocatore e pallina coincidono! Modalità attuale: ${gameState.mode}`);
         }
     }
 
@@ -1126,37 +1421,40 @@
 
 
     canvas.addEventListener("click", e => {
-        if (gameState.mode !== "shot") return;
-
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        const cellPx = rect.width / view.size;
 
-        const targetC = view.x + mouseX / cellPx;
-        const targetR = view.y + mouseY / cellPx;
+        if (gameState.mode === "shot") {
+            // Mappa normale
+            const cellPx = rect.width / view.size;
+            const targetC = view.x + mouseX / cellPx;
+            const targetR = view.y + mouseY / cellPx;
 
-        // Aggiorna solo il target del tiro, non lanciare ancora la pallina
-        shotTarget = { c: targetC, r: targetR };
+            shotTarget = { c: targetC, r: targetR };
+            render();
+            updateShotInfo(shotTarget);
 
-        render();
-        renderPuttView();
-        updateShotInfo(shotTarget);
+        } else if (gameState.mode === "putt" && gameState.puttView) {
+            // Mappa putt zoomata
+            const putt = gameState.puttView;
+
+            const offsetX = (canvas.width - putt.grid[0].length * putt.tileSize) / 2 + (putt.offset?.x || 0);
+            const offsetY = (canvas.height - putt.grid.length * putt.tileSize) / 2 + (putt.offset?.y || 0);
+
+            const px = mouseX - offsetX;
+            const py = mouseY - offsetY;
+
+            const localC = px / putt.tileSize;
+            const localR = py / putt.tileSize;
+            puttTarget = { c: localC, r: localR };
+
+            renderPuttView(putt);
+            updateShotInfo(puttTarget);
+        }
     });
 
-    let frameCounter = 0; // conta quante animazioni sono in coda
-
-    function logAnimationQueue() {
-        frameCounter = 0;
-        if (ballAnimFrame) frameCounter++;
-        if (cameraReturnFrame) frameCounter++;
-        if (gameState.followingPlayer) frameCounter++;
-
-        console.log("Frames attivi:", frameCounter);
-    }
-
     let ballAnimFrame = null; // tiene traccia dell'animazione della pallina
-    let cameraReturnFrame = null; // tiene traccia dell'animazione del ritorno della camera
 
     function updateBall() {
         if (!gameState.ball.moving) return;
@@ -1172,48 +1470,45 @@
 
             // soglia per considerare "arrivato" (in celle)
             if (distToFlight < 0.08) {
-                // scatta atterraggio: posiziona esattamente sul flightTarget
                 gameState.ball.c = ft.c;
                 gameState.ball.r = ft.r;
 
-                // segna il punto di atterraggio (visibile nel render)
+                // segna il punto di atterraggio
                 lastLandingSpot = { c: Math.round(ft.c), r: Math.round(ft.r), time: performance.now() };
-                // pulisci dopo 2s
                 setTimeout(() => { lastLandingSpot = null; }, 2000);
 
                 // passa alla fase di rotolo
                 gameState.ball.phase = "roll";
 
-                // imposta la velocità iniziale per il rotolo basata su rollTarget
                 const rt = gameState.ball.rollTarget;
                 const rollDistance = Math.hypot(rt.c - ft.c, rt.r - ft.r);
 
                 if (rollDistance <= 0.001) {
-                    // niente rotolo: fermati subito
                     gameState.ball.dx = 0;
                     gameState.ball.dy = 0;
                     gameState.ball.moving = false;
                 } else {
-                    // definiamo quanti frame vogliamo per il rotolo (più roll => più frame)
                     const rollFrames = Math.max(6, Math.round((gameState.ball.currentShot.roll || 1) * 6));
                     gameState.ball.dx = (rt.c - ft.c) / rollFrames;
                     gameState.ball.dy = (rt.r - ft.r) / rollFrames;
                 }
 
-                // segnala in console l'atterraggio (utile)
                 console.log(`%c🛬 Atterraggio volo: c=${Math.round(ft.c)}, r=${Math.round(ft.r)}`, "color:orange;font-weight:bold;");
             }
-        } else if (gameState.ball.phase === "roll") {
-            // nella fase di rotolo applichiamo attrito / decelerazione
-            const friction = 0.88; // più basso = fermo prima
+        }
+        // fase di rotolo
+        else if (gameState.ball.phase === "roll") {
+            const friction = 0.88;
             gameState.ball.dx *= friction;
             gameState.ball.dy *= friction;
 
             const rt = gameState.ball.rollTarget;
             const distToRoll = Math.hypot(rt.c - gameState.ball.c, rt.r - gameState.ball.r);
 
-            // se siamo molto vicini al rollTarget o velocità molto bassa -> fermati
-            if (distToRoll < 0.08 || (Math.abs(gameState.ball.dx) < 0.01 && Math.abs(gameState.ball.dy) < 0.01)) {
+            if (
+                distToRoll < 0.08 ||
+                (Math.abs(gameState.ball.dx) < 0.01 && Math.abs(gameState.ball.dy) < 0.01)
+            ) {
                 gameState.ball.c = rt.c;
                 gameState.ball.r = rt.r;
                 gameState.ball.dx = 0;
@@ -1221,17 +1516,17 @@
                 gameState.ball.moving = false;
                 gameState.ball.phase = "stopped";
 
-                // log finale
                 console.log(`%c🔚 Rotolo finito: c=${Math.round(rt.c)}, r=${Math.round(rt.r)}`, "color:green;font-weight:bold;");
             }
-        } else {
-            // fallback: frena un po' (non dovrebbe succedere)
+        }
+        // fase di movimento residuo
+        else {
             const friction = 0.92;
             gameState.ball.dx *= friction;
             gameState.ball.dy *= friction;
         }
 
-        // camera segue la palla
+        // --- Movimento camera (segue la palla) ---
         if (currentMap) {
             const targetViewX = gameState.ball.c - view.size / 2;
             const targetViewY = gameState.ball.r - view.size / 2;
@@ -1240,17 +1535,20 @@
             view.y += (targetViewY - view.y) * lerpFactor;
         }
 
+        // --- Rendering normale ---
         render();
 
-        // se la palla si è fermata completamente, passiamo in modalità player
+        // --- Se la palla si è fermata ---
         if (!gameState.ball.moving) {
             gameState.ball.c = Math.round(gameState.ball.c);
             gameState.ball.r = Math.round(gameState.ball.r);
+
+            // ritorna al controllo del giocatore
             gameState.mode = "player";
             gameState.ball.landed = false;
             updateControlsUI();
 
-            // piccolo ritorno camera sul giocatore dopo 1s
+            // --- ritorno dolce della camera sul giocatore ---
             setTimeout(() => {
                 const smoothReturn = () => {
                     const targetViewX = gameState.player.c - view.size / 2;
@@ -1258,12 +1556,14 @@
                     const lerpFactor = 0.1;
                     const dx = targetViewX - view.x;
                     const dy = targetViewY - view.y;
+
                     if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
                         view.x = targetViewX;
                         view.y = targetViewY;
                         render();
                         return;
                     }
+
                     view.x += dx * lerpFactor;
                     view.y += dy * lerpFactor;
                     render();
@@ -1275,10 +1575,56 @@
             return;
         }
 
-        // altrimenti prosegui animazione
+        // --- Continua animazione ---
         ballAnimFrame = requestAnimationFrame(updateBall);
         updateDistanceTravelled();
+    }
 
+    // --- Funzione di aggiornamento del putt ---
+    function updatePutt() {
+        const pv = gameState.puttView;
+        const ball = gameState.ball.local;
+        const target = gameState.puttTarget;
+
+        if (!pv || !ball || !gameState.ball.moving) return;
+
+        // Calcola differenza diretta
+        const deltaC = target.c - ball.c;
+        const deltaR = target.r - ball.r;
+        const dist = Math.hypot(deltaC, deltaR);
+
+        // 🔹 Se siamo arrivati a destinazione
+        if (dist < 0.3) {
+            ball.c = target.c;
+            ball.r = target.r;
+            gameState.ball.moving = false;
+
+            console.log(
+                `🟢 Palla ferma → modalità PUTTMOVE\n` +
+                `   Posizione finale: c=${ball.c.toFixed(2)}, r=${ball.r.toFixed(2)}`
+            );
+
+            gameState.mode = "puttmove";
+            updateControlsUI();
+            enterPuttView();
+            renderPuttView(pv);
+            return;
+        }
+
+        // --- Movimento costante verso il target corretto ---
+        const speed = 0.05;
+
+        // Calcola direzione normalizzata
+        const dx = (deltaC / dist) * speed;
+        const dy = (deltaR / dist) * speed;
+
+        // Aggiorna posizione
+        ball.c += dx;
+        ball.r += dy;
+
+        // Rendering continuo
+        renderPuttView(pv);
+        requestAnimationFrame(updatePutt);
     }
 
     let wind = {
@@ -1287,7 +1633,7 @@
     };
     function updateWind() {
         // Vento varia leggermente ogni tiro
-        wind.strength = Math.max(0, Math.min(3.5, wind.strength + (Math.random() - 0.5)));
+        wind.strength = Math.max(0, Math.min(2.5, wind.strength + (Math.random() - 0.5)));
         wind.direction = (wind.direction + Math.floor(Math.random() * 3) - 1 + 8) % 8;
     }
     function updateWindDisplay() {
@@ -1347,161 +1693,282 @@
 
     // --- Funzione hitBall ---
     function hitBall(club, special, shotTarget, barValue = 50) {
-       updateWind();
 
-        // === 1️⃣ Calcolo accuracy effettiva ===
-        const baseAccuracy = club.accuracy || 1;
-        const bonus = (1 - baseAccuracy) * (barValue / 100);
-        let finalAccuracy = Math.min(1, baseAccuracy + bonus);
+        // --- 1️⃣ Normalizza barra ---
+        const normBar = barValue / 100; // 0..1
 
-        // === 2️⃣ Costruisci l'oggetto "shot" base ===
+        // --- 2️⃣ Costruisci shot base ---
         let shot = {
             distance: club.distance || 5,
             roll: club.roll || 0,
-            accuracy: finalAccuracy
+            accuracy: club.accuracy || 1
         };
 
-        // === 2.1️⃣ Applica modificatori del terreno di partenza ===
         const tileMod = getTileModifierAt(gameState.ball.c, gameState.ball.r, club.id);
-
-        // Applica i moltiplicatori
         shot.distance *= tileMod.distance ?? 1;
         shot.roll *= tileMod.roll ?? 1;
         shot.accuracy *= tileMod.accuracy ?? 1;
 
-        console.log(
-            `%c🌿 Tile: ${getTileTypeAt(gameState.ball.c, gameState.ball.r)} ` +
-            `(mazza=${club.id}, dist×${tileMod.distance}, roll×${tileMod.roll}, acc×${tileMod.accuracy})`,
-            "color:#8f8;font-style:italic;"
-        );
-
-        // === 3️⃣ Applica modifiche speciali ===
         if (special && typeof special.modify === "function") {
             special.modify(shot);
         }
 
-        // Evita valori fuori scala
         shot.accuracy = Math.min(1, Math.max(0.1, shot.accuracy));
         shot.roll = Math.max(0, shot.roll);
         shot.distance = Math.max(1, shot.distance);
 
-        // === 4️⃣ Calcola direzione e punto base ===
+        // --- 3️⃣ Calcola precisione finale in base alla barra ---
+        let precisionFactor;
+        if (barValue >= 45 && barValue <= 65) {
+            precisionFactor = 0.99; // 100%
+        } else {
+            let distFromCenter = Math.abs(normBar - 0.5) * 2;
+            precisionFactor = 1 - (1 - shot.accuracy) * distFromCenter;
+        }
+
+        const lateralDeviation = normBar - 0.5; // per deviazione angolare
+
+        // --- 4️⃣ Direzione verso target ---
         const dx = shotTarget.c - gameState.ball.c;
         const dy = shotTarget.r - gameState.ball.r;
         const len = Math.sqrt(dx * dx + dy * dy);
         const dirX = dx / len;
         const dirY = dy / len;
 
-        // === 5️⃣ Calcolo errore casuale in base all'accuracy ===
-        const errorRadius = shot.distance * (1 - shot.accuracy);
-        const angleError = (Math.random() - 0.5) * (Math.PI / 8) * (1 - shot.accuracy);
+        // --- 5️⃣ Calcolo errore dovuto all'accuracy ---
+        const errorRadius = shot.distance * (1 - precisionFactor);
+        const angleError = lateralDeviation * (Math.PI / 4) + (Math.random() - 0.5) * (Math.PI / 16) * (1 - precisionFactor);
         const distError = (Math.random() - 0.5) * errorRadius;
 
         const finalX = Math.cos(angleError) * dirX - Math.sin(angleError) * dirY;
         const finalY = Math.sin(angleError) * dirX + Math.cos(angleError) * dirY;
 
-        // === 6️⃣ Volo (senza roll) ===
+        const pureAccuracyOffset = Math.hypot(finalX * shot.distance - dx, finalY * shot.distance - dy);
+
+        console.log(
+            `%c🌟 HIT BALL INFO:` +
+            `\n   Barra accuracy: ${barValue}%` +
+            `\n   Precisione complessiva: ${(precisionFactor * 100).toFixed(2)}%` +
+            `\n   Deviazione dovuta all'accuracy: ${pureAccuracyOffset.toFixed(2)} tiles`,
+            "color:#fa0;font-weight:bold;"
+        );
+
+        // --- 6️⃣ Volo senza vento ---
         let flightTarget = {
             c: gameState.ball.c + finalX * (shot.distance + distError),
             r: gameState.ball.r + finalY * (shot.distance + distError)
         };
 
-        // === 7️⃣ Influenza del vento solo sul volo ===
-        const windEffect = shot.distance * (wind.strength / 10);
-        let wx = 0, wy = 0;
-        switch (wind.direction) {
-            case 0: wy = -1; break; // N
-            case 1: wx = 1; wy = -1; break; // NE
-            case 2: wx = 1; break; // E
-            case 3: wx = 1; wy = 1; break; // SE
-            case 4: wy = 1; break; // S
-            case 5: wx = -1; wy = 1; break; // SO
-            case 6: wx = -1; break; // O
-            case 7: wx = -1; wy = -1; break; // NO
-        }
+        const flightWithoutWind = { ...flightTarget };
 
-        flightTarget.c += wx * windEffect;
-        flightTarget.r += wy * windEffect;
+        // --- 7️⃣ Calcolo vento ---
+        const windAngleRad = wind.direction * (Math.PI / 4); // 8 direzioni → radianti
+        const windVectorX = Math.cos(windAngleRad);
+        const windVectorY = Math.sin(windAngleRad);
 
-        // === 8️⃣ Verifica il terreno di atterraggio ===
-        const landingMod = getTileModifierAt(flightTarget.c, flightTarget.r, club.id);
+        // ✅ Applica eventuale moltiplicatore dallo special
+        const windMultiplier = special?.windMultiplier ?? 1;
+        const effectiveWindStrength = wind.strength * windMultiplier;
 
-        // Applica solo al rotolo (non al volo)
-        shot.roll *= landingMod.roll ?? 1;
-        //shot.accuracy *= landingMod.accuracy ?? 1; // opzionale: influenza l’imprecisione finale
+        const windEffect = shot.distance * (effectiveWindStrength / 15);
+        flightTarget.c += windVectorX * windEffect;
+        flightTarget.r += windVectorY * windEffect;
 
+        // --- 🔹 Log effetto vento ---
+        const windOffset = Math.hypot(flightTarget.c - flightWithoutWind.c, flightTarget.r - flightWithoutWind.r);
         console.log(
-            `%c🪶 Atterra su ${getTileTypeAt(flightTarget.c, flightTarget.r)} ` +
-            `(roll×${landingMod.roll ?? 1}, acc×${landingMod.accuracy ?? 1})`,
-            "color:#6af;font-style:italic;"
+            `%c💨 Effetto vento:` +
+            `\n   Forza effettiva: ${effectiveWindStrength.toFixed(2)} (×${windMultiplier})` +
+            `\n   Vettore vento: dx=${(flightTarget.c - flightWithoutWind.c).toFixed(2)}, dy=${(flightTarget.r - flightWithoutWind.r).toFixed(2)}` +
+            `\n   Spostamento totale dovuto al vento: ${windOffset.toFixed(2)} tiles`,
+            "color:#0cf;font-weight:bold;"
         );
 
-        // === 9️⃣ Calcola il rotolo finale ===
+        // --- 8️⃣ Rotolo finale ---
+        const landingMod = getTileModifierAt(flightTarget.c, flightTarget.r, club.id);
+        shot.roll *= landingMod.roll ?? 1;
+
         let rollTarget = {
             c: flightTarget.c + finalX * shot.roll,
             r: flightTarget.r + finalY * shot.roll
         };
 
-        // === 🔟 Arrotonda valori finali ===
-        flightTarget.c = Math.round(flightTarget.c);
-        flightTarget.r = Math.round(flightTarget.r);
-        rollTarget.c = Math.round(rollTarget.c);
-        rollTarget.r = Math.round(rollTarget.r);
+        // --- 9️⃣ Arrotonda solo alla fine ---
+        flightTarget.c = Math.floor(flightTarget.c);
+        flightTarget.r = Math.floor(flightTarget.r);
+        rollTarget.c = Math.floor(rollTarget.c);
+        rollTarget.r = Math.floor(rollTarget.r);
 
-        // === 1️⃣1️⃣ Restituisci tutto ===
         return {
-            flightTarget, // dove atterra la pallina
-            rollTarget,   // dove finisce dopo il rotolo
-            shot          // dati effettivi (distance, roll, accuracy)
+            flightTarget,
+            rollTarget,
+            shot
+        };
+    }
+
+    function hitPutt(ball, puttTarget, pv, barValue = 50) {
+        // --- ⚙️ Parametri ---
+        const basePower = Math.max(0.2, barValue / 100);
+        const baseSlopeInfluence = 8;
+        const samplingStep = 0.3;
+        const maxDeviation = 20;
+
+        const start = { c: ball.c, r: ball.r };
+        const target = { c: puttTarget.c, r: puttTarget.r };
+
+        const dx = target.c - start.c;
+        const dy = target.r - start.r;
+        const dist = Math.hypot(dx, dy);
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+
+        // --- Influenza pendenza ---
+        const minDist = 4;
+        const maxDist = 12;
+        const distFactor = Math.min(1, Math.max(0, (dist - minDist) / (maxDist - minDist)));
+        const slopeInfluence = baseSlopeInfluence * distFactor;
+
+        let offsetC = 0;
+        let offsetR = 0;
+
+        for (let t = 0; t <= dist; t += samplingStep) {
+            const cPos = start.c + dirX * t;
+            const rPos = start.r + dirY * t;
+            const rIdx = Math.floor(rPos);
+            const cIdx = Math.floor(cPos);
+            if (!pv.heights[rIdx] || pv.heights[rIdx][cIdx] === undefined) continue;
+
+            const h = pv.heights[rIdx][cIdx];
+            const hL = pv.heights[rIdx]?.[cIdx - 1] ?? h;
+            const hR = pv.heights[rIdx]?.[cIdx + 1] ?? h;
+            const hU = pv.heights[rIdx - 1]?.[cIdx] ?? h;
+            const hD = pv.heights[rIdx + 1]?.[cIdx] ?? h;
+
+            const gradC = (hR - hL) * 0.5;
+            const gradR = (hD - hU) * 0.5;
+
+            offsetC += gradC * slopeInfluence * (1 - t / dist) * basePower;
+            offsetR += gradR * slopeInfluence * (1 - t / dist) * basePower;
+        }
+
+        offsetC = Math.max(-maxDeviation, Math.min(maxDeviation, offsetC));
+        offsetR = Math.max(-maxDeviation, Math.min(maxDeviation, offsetR));
+
+        // --- 🎯 Deviazione da barra accuracy (putt = max ±10%) ---
+        const normBar = barValue / 100;
+        const basePuttAccuracy = 0.9; // 90% di precisione base
+
+        // Calcolo precisione effettiva della barra
+        let precisionFactor;
+        if (barValue >= 45 && barValue <= 55) { // centro barra ±5%
+            precisionFactor = 0.99; // 100%
+        } else {
+            const distFromCenter = Math.abs(normBar - 0.5) * 2; // 0..1
+            precisionFactor = 1 - (1 - basePuttAccuracy) * distFromCenter;
+        }
+
+        // Deviazione laterale massima ±10% della distanza
+        const lateralDeviation = (1 - precisionFactor) * 0.1 * dist;
+        const angle = (Math.random() < 0.5 ? -1 : 1) * lateralDeviation;
+
+        const adjustedTarget = {
+            c: Math.floor(target.c + offsetC + angle * dirY),
+            r: Math.floor(target.r + offsetR - angle * dirX)
         };
 
+        const pureAccuracyOffset = Math.hypot(adjustedTarget.c - target.c, adjustedTarget.r - target.r);
+
+        console.log(
+            `%c⛳ PUTT HIT INFO:` +
+            `\n   Barra accuracy: ${barValue}%` +
+            `\n   Precisione effettiva: ${(precisionFactor * 100).toFixed(2)}%` +
+            `\n   Deviazione dovuta all'accuracy: ${pureAccuracyOffset.toFixed(2)} tiles`,
+            "color:#4af;font-weight:bold;"
+        );
+
+        // --- Rotolo residuo ---
+        const rollDistance = 1.2 * basePower;
+        const rollDirX = (adjustedTarget.c - start.c) / dist;
+        const rollDirR = (adjustedTarget.r - start.r) / dist;
+        const rollTarget = {
+            c: adjustedTarget.c + rollDirX * rollDistance,
+            r: adjustedTarget.r + rollDirR * rollDistance
+        };
+
+        return {
+            finalTarget: adjustedTarget,
+            rollTarget
+        };
     }
 
     document.getElementById("shootBtn").onclick = () => {
-        if (!selectedClub || !selectedSpecial || !shotTarget) return;
-
-        holeShots++;
-        updateHoleHUD();
-        // 1️⃣ Ferma la barra e ottieni il valore (0–100)
-        const barValue = stopAccuracyBar();
+        const barValue = stopAccuracyBar(); // ferma la barra e ottieni il valore corrente (0..100)
         isAnimatingAccuracy = false;
 
-        // 🔹 Mostra visivamente il punto di stop
+        // Aggiorna visivamente la barra
         const fill = document.getElementById("accuracyFill");
         if (fill) fill.style.width = `${barValue}%`;
 
-        // 2️⃣ Calcola il tiro con hitBall()
-        const result = hitBall(selectedClub, selectedSpecial, shotTarget, barValue);
-        const { flightTarget, rollTarget, shot } = result;
+        if (gameState.mode === "shot") {
+            if (!selectedClub || !shotTarget) return;
 
-        // Salva i dati del tiro nello stato della pallina
-        gameState.ball.phase = "flight";           // "flight" -> "roll" -> stopped
-        gameState.ball.flightTarget = { ...flightTarget };
-        gameState.ball.rollTarget = { ...rollTarget };
-        gameState.ball.currentShot = shot;         // contiene distance, roll, accuracy
+            holeShots++;
+            updateHoleHUD();
+            updateDistanceTravelled();
 
-        // Decidi quanti frame vuole durare il volo (più distanza => più frame)
-        const flightFrames = Math.max(8, Math.round(shot.distance * 6)); // tuning
-        gameState.ball.dx = (flightTarget.c - gameState.ball.c) / flightFrames;
-        gameState.ball.dy = (flightTarget.r - gameState.ball.r) / flightFrames;
-        gameState.ball.moving = true;
-        gameState.ball.landed = false; // verrà settato quando arriva sul flightTarget
+            // --- Calcolo colpo normale ---
+            const result = hitBall(selectedClub, selectedSpecial, shotTarget, barValue);
+            const { flightTarget, rollTarget, shot } = result;
 
-        gameState.mode = "ball";
-        updateControlsUI();
-        requestAnimationFrame(updateBall);
-        updateWindDisplay();
+            gameState.ball.phase = "flight";
+            gameState.ball.flightTarget = { ...flightTarget };
+            gameState.ball.rollTarget = { ...rollTarget };
+            gameState.ball.currentShot = shot;
 
-        // Log
-        console.groupCollapsed(`🏌️‍♂️ Tiro con ${selectedClub.name}`);
-        console.log(`🎯 Barra fermata a: ${barValue.toFixed(1)}%`);
-        console.log(`✅ Accuracy finale: ${(shot.accuracy * 100).toFixed(1)}%`);
-        console.log(`🌬️ Vento: ${wind.strength.toFixed(1)} dir=${wind.direction}`);
-        console.log(`🕊️ Distanza volo prevista: ${shot.distance.toFixed(2)} celle`);
-        console.log(`🌀 Rotolo previsto: ${shot.roll.toFixed(2)} celle`);
-        console.log(`🎯 flightTarget → c:${flightTarget.c}, r:${flightTarget.r}`);
-        console.log(`🎯 rollTarget   → c:${rollTarget.c}, r:${rollTarget.r}`);
-        console.groupEnd();
+            const flightFrames = Math.max(8, Math.round(shot.distance * 6));
+            gameState.ball.dx = (flightTarget.c - gameState.ball.c) / flightFrames;
+            gameState.ball.dy = (flightTarget.r - gameState.ball.r) / flightFrames;
+            gameState.ball.moving = true;
+            gameState.ball.landed = false;
+
+            gameState.mode = "ball";
+            updateControlsUI();
+            cancelAnimationFrame(ballAnimFrame);
+            requestAnimationFrame(updateBall);
+            updateWindDisplay();
+            return;
+        }
+
+        if (gameState.mode === "putt") {
+            if (!puttTarget || !gameState.puttView || !gameState.ball.local) return;
+
+            holeShots++;
+            updateHoleHUD();
+
+            const pv = gameState.puttView;
+            const ball = gameState.ball.local;
+
+            // --- Normalizza barra e calcola precisione (limite 10%) ---
+            const normBar = barValue / 100; // 0..1
+            const precisionFactor = getAccuracyFromBar(normBar); // 0..1, massimo al centro
+            const lateralDeviationFactor = 0.1; // massimo 10% della distanza del putt
+            const adjustedBarValue = precisionFactor * lateralDeviationFactor * Math.hypot(puttTarget.c - ball.c, puttTarget.r - ball.r);
+
+            // Passa la deviazione calcolata a hitPutt
+            const { finalTarget, rollTarget } = hitPutt(ball, puttTarget, pv, adjustedBarValue);
+
+            gameState.puttTarget = finalTarget;
+            gameState.puttRollTarget = rollTarget;
+
+            console.log(`🎯 PUTT confermato: target finale c:${finalTarget.c}, r:${finalTarget.r}`);
+
+            // Avvia animazione putt
+            gameState.ball.moving = true;
+            gameState.mode = "putt";
+            updateControlsUI();
+            renderPuttView(pv);
+            requestAnimationFrame(updatePutt);
+        }
     };
 
     // Stato selezionato
@@ -1568,10 +2035,37 @@
             card.className = "deck-card";
             card.dataset.name = shot.name;
 
+            // Colori in base al tipo di shot
+            switch (shot.id) {
+                case 'power':
+                    card.style.backgroundColor = '#ff0000'; // arancione acceso
+                    card.style.color = '#fff';
+                    break;
+                case 'spin':
+                    card.style.backgroundColor = '#1E90FF'; // blu intenso
+                    card.style.color = '#fff';
+                    break;
+                case 'accuracy':
+                    card.style.backgroundColor = '#ff9500'; // verde lime
+                    card.style.color = '#000';
+                    break;
+                case 'special':
+                    card.style.backgroundColor = '#8A2BE2'; // viola
+                    card.style.color = '#fff';
+                    break;
+                case 'wind':
+                    card.style.backgroundColor = '#03fca1'; // viola
+                    card.style.color = '#000000';
+                    break;
+                default:
+                    card.style.backgroundColor = '#ccc'; // grigio neutro
+                    card.style.color = '#000';
+            }
+
             card.innerHTML = `
-            <div class="name">${shot.name}</div>
-            <div class="desc">${shot.desc}</div>
-        `;
+        <div class="name">${shot.name}</div>
+        <div class="desc">${shot.desc}</div>
+    `;
             card.onclick = () => selectSpecial(shot.name);
             shotDeck.appendChild(card);
         });
@@ -1584,12 +2078,30 @@
         document.querySelectorAll("#clubDeck .deck-card")
             .forEach(c => c.classList.toggle("selected", c.dataset.name === name));
         updateShotInfo(shotTarget || gameState.ball);
+        render();
     }
 
     function selectSpecial(name) {
         selectedSpecial = Specials.find(s => s.name === name);
+
         document.querySelectorAll("#shotDeck .deck-card")
             .forEach(c => c.classList.toggle("selected", c.dataset.name === name));
+
+        // ✅ Se lo special influisce sul vento, aggiorna subito la forza e il display
+        if (selectedSpecial?.id === "wind") {
+            // Applica moltiplicatore
+            const baseWind = wind.baseStrength ?? wind.strength; // salva il vento originale una sola volta
+            if (!wind.baseStrength) wind.baseStrength = baseWind;
+
+            wind.strength = wind.baseStrength * (selectedSpecial.windMultiplier ?? 1);
+            updateWindDisplay();
+
+            console.log(`💨 Vento modificato: base=${baseWind.toFixed(2)}, attuale=${wind.strength.toFixed(2)} (×${selectedSpecial.windMultiplier})`);
+        } else if (wind.baseStrength) {
+            // Se cambio carta e il vento era stato modificato, ripristinalo
+            wind.strength = wind.baseStrength;
+            updateWindDisplay();
+        }
 
         // Aggiorna HUD
         updateShotInfo(shotTarget || gameState.ball);
@@ -1663,49 +2175,58 @@
         window._resizeT = setTimeout(fitCanvas, 200);
     });
 
-    // === Barra dinamica di accuratezza ===
-    let accuracyValue = 50;       // Valore corrente (0-100)
-    let direction = 1;            // 1 = va a destra, -1 = torna indietro
-    let accuracyAnimation = null; // requestAnimationFrame handler
+    const fillRight = document.getElementById("accuracyFillRight");
+    const fillLeft = document.getElementById("accuracyFillLeft");
+    let accValue = 0.5;   // centro
+    let accPhase = 0;     // 0: centro→destra, 1: destra→centro, 2: centro→sinistra, 3: sinistra→centro
+    let accuracyAnimation = null;
     let isAnimatingAccuracy = false;
+    const speed = 0.015;
 
     function startAccuracyBar() {
-        const fill = document.getElementById("accuracyFill");
-        if (!fill) return;
+        if (!fillRight || !fillLeft) return;
+        if (isAnimatingAccuracy) return;
+
         isAnimatingAccuracy = true;
 
-        const baseSpeed = 1.2;  // 🔹 più lento rispetto a prima (era 3.5)
-        const accelFactor = 60; // 🔹 più grande = accelera più dolcemente (era 40 → ora va più fluido)
-        const maxSpeed = 5;     // 🔹 limite massimo raggiungibile (era 7 → più controllabile)
-
-        function animate() {
+        const animate = () => {
             if (!isAnimatingAccuracy) return;
 
-            // 🔹 calcolo velocità dinamica più bilanciata
-            const dynamicSpeed = Math.min(baseSpeed + (accuracyValue / accelFactor), maxSpeed);
-
-            accuracyValue += direction * dynamicSpeed;
-
-            if (accuracyValue >= 100) {
-                accuracyValue = 100;
-                direction = -1;
-            } else if (accuracyValue <= 0) {
-                accuracyValue = 0;
-                direction = 1;
+            switch (accPhase) {
+                case 0: accValue += speed; if (accValue >= 1) { accValue = 1; accPhase = 1; } break;
+                case 1: accValue -= speed; if (accValue <= 0.5) { accValue = 0.5; accPhase = 2; } break;
+                case 2: accValue -= speed; if (accValue <= 0) { accValue = 0; accPhase = 3; } break;
+                case 3: accValue += speed; if (accValue >= 0.5) { accValue = 0.5; accPhase = 0; } break;
             }
 
-            fill.style.width = `${accuracyValue}%`;
-            accuracyAnimation = requestAnimationFrame(animate);
-        }
+            // Aggiorna fill destro
+            if (accPhase === 0 || accPhase === 1) {
+                const rightScale = Math.max(0, (accValue - 0.5) * 2); // 0..1
+                fillRight.style.transform = `scaleX(${rightScale})`;
+                fillLeft.style.transform = `scaleX(0)`;
+            } else {
+                const leftScale = Math.max(0, (0.5 - accValue) * 2); // 0..1
+                fillLeft.style.transform = `scaleX(${leftScale})`;
+                fillRight.style.transform = `scaleX(0)`;
+            }
 
-        animate();
+            accuracyAnimation = requestAnimationFrame(animate);
+        };
+
+        accuracyAnimation = requestAnimationFrame(animate);
     }
 
-    // Ferma animazione e restituisce il valore corrente
     function stopAccuracyBar() {
+        if (accuracyAnimation) {
+            cancelAnimationFrame(accuracyAnimation);
+            accuracyAnimation = null;
+        }
         isAnimatingAccuracy = false;
-        if (accuracyAnimation) cancelAnimationFrame(accuracyAnimation);
-        return accuracyValue; // Ritorna il valore finale della barra
+        return Math.round(accValue * 100);
+    }
+    function getAccuracyFromBar(value) {
+        const distanceFromCenter = Math.abs(value - 0.5);
+        return Math.max(0, 1 - distanceFromCenter * 2);
     }
 
     document.addEventListener("keydown", e => {
@@ -1718,5 +2239,4 @@
     fitCanvas();
     updateControlsUI();
     updateWindDisplay();
-
 })();

@@ -7,7 +7,7 @@ Special cards modificano il tiro: extraDistance, curve, stopOnGreen, ecc.
 
 
 const Clubs = [
-    { num: 16, cost: 0, id: 'putt', name: 'Putt', distance: 0.1, roll: 2, accuracy: 1, desc: 'Per i tiri sul green' },
+    { num: 16, cost: 0, id: 'putt', name: 'Putt', distance: 0.1, roll: 2, accuracy: 0.99, desc: 'Per i tiri sul green' },
     { num: 15, cost: 4,  id: 'wedge', name: 'Wedge', distance: 3, roll: 1, accuracy: 0.95, desc: 'Tiro corto e preciso' },
     { num: 14, cost: 5, id: 'sand', name: 'Sand', distance: 4, roll: 1, accuracy: 0.95, desc: 'Utile per uscire dalla sabbia' },
     { num: 13, cost: 5, id: 'pitch', name: 'Pitch', distance: 5, roll: 1, accuracy: 0.90, desc: 'Tiro corto e preciso' },
@@ -34,11 +34,14 @@ const Specials = [
     { num: 5, cost: 15, id: 'spin', name: 'Backspin', desc: '-2,5 🌀', modify: (shot) => { shot.roll -= 2.5 } },
     { num: 6, cost: 10, id: 'spin', name: 'Stop shot', desc: '-50% 🌀', modify: (shot) => { shot.roll *= 0.5 } },
     { num: 7, cost: 7, id: 'spin', name: 'Topspin', desc: '+50% 🌀', modify: (shot) => { shot.roll *= 1.5 } },
-    { num: 8, cost: 10, id: 'special', name: 'Rough shot', desc: '100% ⛳ da rough', modify: (shot) => { shot.roll *= 1.5 } },
-    { num: 9, cost: 6, id: 'special', name: 'Sand shot', desc: '100% ⛳ da bunker', modify: (shot) => { shot.roll *= 1.5 } },
+    { num: 8, cost: 10, id: 'special', name: 'Rough shot', desc: '50% ⛳ da rough', modify: (shot) => { shot.distance *= 1.5 } },
+    { num: 9, cost: 6, id: 'special', name: 'Sand shot', desc: '100% ⛳ da bunker', modify: (shot) => { shot.distance *= 2 } },
     { num: 10, cost: 4, id: 'accuracy', name: 'Accuracy', desc: '+10% 🎯', modify: (shot) => { shot.accuracy = 1.1 } },
-    { num: 11, cost: 6, id: 'curve', name: 'Accuracy +', desc: '+20% 🎯', modify: (shot) => { shot.accuracy = 1.2 } },
-    { num: 12, cost: 8, id: 'curve', name: 'Accuracy ++', desc: '+30% 🎯', modify: (shot) => { shot.accuracy = 1.3 } },
+    { num: 11, cost: 6, id: 'accuracy', name: 'Accuracy +', desc: '+20% 🎯', modify: (shot) => { shot.accuracy = 1.2 } },
+    { num: 12, cost: 8, id: 'accuracy', name: 'Accuracy ++', desc: '+30% 🎯', modify: (shot) => { shot.accuracy = 1.3 } },
+    { num: 13, cost: 4, id: 'wind', name: 'wind -', desc: '-25% 💨', windMultiplier: 0.75 },
+    { num: 14, cost: 8, id: 'wind', name: 'wind --', desc: '-50% 💨', windMultiplier: 0.5 },
+
 ];
 
 // === 🎨 TILE MODIFIERS SYSTEM ===
