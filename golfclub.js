@@ -1,4 +1,5 @@
 (() => {
+    // #region costanti globali
     const canvas = document.getElementById("mapCanvas");
     const ctx = canvas.getContext("2d", { alpha: false });
     const upBtn = document.getElementById("upBtn");
@@ -46,8 +47,9 @@
         club: "wood",
         shotPower: 0
     };
+    // #endregion
 
-
+    // #region costruzione mappa
     const PARS9 = [3, 3, 4, 4, 4, 4, 4, 5, 5];
     const PAR_RANGES = { 3: [12, 18], 4: [22, 30], 5: [35, 45] };
 
@@ -636,6 +638,9 @@
         return heights;
     }
 
+    // #endregion
+
+    // #region rendering
     function startPuttLoop() {
         function loop() {
             if (gameState.mode !== "putt") return; // esce se si torna alla mappa normale
@@ -1151,6 +1156,10 @@
         //logAnimationQueue();
     }
 
+    // #endregion
+
+    // #region controli vari
+
     // Controllo camera libera (freccette)
     function moveView(dx, dy) {
         if ((gameState.mode === "putt" || gameState.mode === "puttmove") && gameState.puttView) {
@@ -1405,6 +1414,57 @@
     downBtn.onclick = () => moveView(0, 5);
     leftBtn.onclick = () => moveView(-5, 0);
     rightBtn.onclick = () => moveView(5, 0);
+    // Eventi frecce diagonali
+    upLeftBtn.onclick = () => moveView(-5, -5);
+    upRightBtn.onclick = () => moveView(5, -5);
+    downLeftBtn.onclick = () => moveView(-5, 5);
+    downRightBtn.onclick = () => moveView(5, 5);
+
+    // 🖱️ Trascinamento mappa (mouse)
+    let isDragging = false;
+    let lastX = 0, lastY = 0;
+
+    canvas.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        // Impedisce selezioni o trascinamenti del browser
+        e.preventDefault();
+    });
+
+    // Ascoltiamo mousemove e mouseup su "window" — così funziona anche se il cursore esce dal canvas
+    window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        moveView(-dx / 3, -dy / 3);
+        lastX = e.clientX;
+        lastY = e.clientY;
+    });
+
+    window.addEventListener("mouseup", () => {
+        isDragging = false;
+    });
+
+    // --- EVENTI TOUCH ---
+    canvas.addEventListener("touchstart", (e) => {
+        if (e.touches.length !== 1) return; // ignora pinch zoom ecc.
+        isDragging = true;
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+        if (!isDragging || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - lastX;
+        const dy = e.touches[0].clientY - lastY;
+        moveView(-dx / 3, -dy / 3);
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+        e.preventDefault(); // evita scroll della pagina
+    });
+
+    canvas.addEventListener("touchend", () => isDragging = false);
 
     // Eventi zoom
     zoomInBtn.onclick = () => zoomView(-1);
@@ -1454,6 +1514,9 @@
         }
     });
 
+    // #endregion
+
+    // #region animazione palla
     let ballAnimFrame = null; // tiene traccia dell'animazione della pallina
 
     function updateBall() {
@@ -1971,6 +2034,64 @@
         }
     };
 
+    const fillRight = document.getElementById("accuracyFillRight");
+    const fillLeft = document.getElementById("accuracyFillLeft");
+    let accValue = 0.5;   // centro
+    let accPhase = 0;     // 0: centro→destra, 1: destra→centro, 2: centro→sinistra, 3: sinistra→centro
+    let accuracyAnimation = null;
+    let isAnimatingAccuracy = false;
+    const speed = 0.015;
+
+    function startAccuracyBar() {
+        if (!fillRight || !fillLeft) return;
+        if (isAnimatingAccuracy) return;
+
+        isAnimatingAccuracy = true;
+
+        const animate = () => {
+            if (!isAnimatingAccuracy) return;
+
+            switch (accPhase) {
+                case 0: accValue += speed; if (accValue >= 1) { accValue = 1; accPhase = 1; } break;
+                case 1: accValue -= speed; if (accValue <= 0.5) { accValue = 0.5; accPhase = 2; } break;
+                case 2: accValue -= speed; if (accValue <= 0) { accValue = 0; accPhase = 3; } break;
+                case 3: accValue += speed; if (accValue >= 0.5) { accValue = 0.5; accPhase = 0; } break;
+            }
+
+            // Aggiorna fill destro
+            if (accPhase === 0 || accPhase === 1) {
+                const rightScale = Math.max(0, (accValue - 0.5) * 2); // 0..1
+                fillRight.style.transform = `scaleX(${rightScale})`;
+                fillLeft.style.transform = `scaleX(0)`;
+            } else {
+                const leftScale = Math.max(0, (0.5 - accValue) * 2); // 0..1
+                fillLeft.style.transform = `scaleX(${leftScale})`;
+                fillRight.style.transform = `scaleX(0)`;
+            }
+
+            accuracyAnimation = requestAnimationFrame(animate);
+        };
+
+        accuracyAnimation = requestAnimationFrame(animate);
+    }
+
+    function stopAccuracyBar() {
+        if (accuracyAnimation) {
+            cancelAnimationFrame(accuracyAnimation);
+            accuracyAnimation = null;
+        }
+        isAnimatingAccuracy = false;
+        return Math.round(accValue * 100);
+    }
+    function getAccuracyFromBar(value) {
+        const distanceFromCenter = Math.abs(value - 0.5);
+        return Math.max(0, 1 - distanceFromCenter * 2);
+    }
+
+    // #endregion
+
+    // #region Gestione mazze e speciali
+
     // Stato selezionato
     let selectedClub = Clubs[0];
     let selectedSpecial = Specials[0];
@@ -2107,6 +2228,10 @@
         updateShotInfo(shotTarget || gameState.ball);
     }
 
+    // #endregion
+
+    // #region Inizializzazione e utility
+
     // Inizializza
     populateDecks();
     selectClub(selectedClub);
@@ -2175,68 +2300,10 @@
         window._resizeT = setTimeout(fitCanvas, 200);
     });
 
-    const fillRight = document.getElementById("accuracyFillRight");
-    const fillLeft = document.getElementById("accuracyFillLeft");
-    let accValue = 0.5;   // centro
-    let accPhase = 0;     // 0: centro→destra, 1: destra→centro, 2: centro→sinistra, 3: sinistra→centro
-    let accuracyAnimation = null;
-    let isAnimatingAccuracy = false;
-    const speed = 0.015;
-
-    function startAccuracyBar() {
-        if (!fillRight || !fillLeft) return;
-        if (isAnimatingAccuracy) return;
-
-        isAnimatingAccuracy = true;
-
-        const animate = () => {
-            if (!isAnimatingAccuracy) return;
-
-            switch (accPhase) {
-                case 0: accValue += speed; if (accValue >= 1) { accValue = 1; accPhase = 1; } break;
-                case 1: accValue -= speed; if (accValue <= 0.5) { accValue = 0.5; accPhase = 2; } break;
-                case 2: accValue -= speed; if (accValue <= 0) { accValue = 0; accPhase = 3; } break;
-                case 3: accValue += speed; if (accValue >= 0.5) { accValue = 0.5; accPhase = 0; } break;
-            }
-
-            // Aggiorna fill destro
-            if (accPhase === 0 || accPhase === 1) {
-                const rightScale = Math.max(0, (accValue - 0.5) * 2); // 0..1
-                fillRight.style.transform = `scaleX(${rightScale})`;
-                fillLeft.style.transform = `scaleX(0)`;
-            } else {
-                const leftScale = Math.max(0, (0.5 - accValue) * 2); // 0..1
-                fillLeft.style.transform = `scaleX(${leftScale})`;
-                fillRight.style.transform = `scaleX(0)`;
-            }
-
-            accuracyAnimation = requestAnimationFrame(animate);
-        };
-
-        accuracyAnimation = requestAnimationFrame(animate);
-    }
-
-    function stopAccuracyBar() {
-        if (accuracyAnimation) {
-            cancelAnimationFrame(accuracyAnimation);
-            accuracyAnimation = null;
-        }
-        isAnimatingAccuracy = false;
-        return Math.round(accValue * 100);
-    }
-    function getAccuracyFromBar(value) {
-        const distanceFromCenter = Math.abs(value - 0.5);
-        return Math.max(0, 1 - distanceFromCenter * 2);
-    }
-
-    document.addEventListener("keydown", e => {
-        if (gameState.mode === "putt" && e.key === "Escape") {
-            exitPuttView();
-        }
-    });
-
     regenerate();
     fitCanvas();
     updateControlsUI();
     updateWindDisplay();
+
+    // #endregion
 })();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Golf Club — Mappa Interattiva</title>
+    <title>Tiny Golf</title>
     <link rel="stylesheet" href="golfclub.css" />
 </head>
 <body>
@@ -35,70 +35,80 @@
         <section class="map-area" aria-label="Mappa di gioco">
             <canvas id="mapCanvas"></canvas>
 
-            <!-- Controlli di movimento sui bordi del quadrato -->
+            <!-- Controlli di movimento cardinali -->
             <div class="nav-controls">
                 <button id="upBtn">↑</button>
                 <button id="downBtn">↓</button>
                 <button id="leftBtn">←</button>
                 <button id="rightBtn">→</button>
             </div>
-        </section>
 
-        <!-- Riga info tiro -->
-        <section id="shot-info" class="shot-info">
-            <span>Distanza: <span id="pointerDistance">0</span> m</span>
-            <span>⛳: <span id="shotPower">0%</span></span>
-            <span>🌀: <span id="shotRoll">0%</span></span>
-            <span>🎯: <span id="shotAccuracy">0%</span></span>
-        </section>
-
-        <section class="player-controls" aria-label="Controlli giocatore">
-            <div class="player-nav">
-                <div class="top">
-                    <button id="playerLU">↖</button>
-                    <button id="playerUp">⭡</button>
-                    <button id="playerRU">↗</button>
-                </div>
-                <div class="middle">
-                    <button id="playerLeft">⭠</button>
-                    <button id="playerNone"> </button>
-                    <button id="playerRight">⭢</button>
-                </div>
-                <div class="bottom">
-                    <button id="playerLD">↙</button>
-                    <button id="playerDown">⭣</button>
-                    <button id="playerRD">↘</button>
-                </div>
+            <!-- Controlli di movimento diagonali -->
+            <div class="nav-diagonals">
+                <button id="upLeftBtn">↖</button>
+                <button id="upRightBtn">↗</button>
+                <button id="downLeftBtn">↙</button>
+                <button id="downRightBtn">↘</button>
             </div>
         </section>
-        <section class="shot-controls" aria-label="Controlli tiro" style="display:none;">
-            <!-- Selezione della mazza -->
-            <div class="shot-row">
-                <div id="clubDeck" class="deck-container"></div>
-            </div>
 
-            <!-- Selezione tipo di tiro -->
-            <div class="shot-row">
-                <div id="shotDeck" class="deck-container"></div>
-            </div>
+        <!-- WRAPPER: colonna destra che contiene shot-info + controlli -->
+        <aside class="right-panel" aria-label="Pannello controlli">
+            <!-- Riga info tiro (in cima) -->
+            <section id="shot-info" class="shot-info">
+                <span>Distanza: <span id="pointerDistance">0</span> m</span>
+                <span>⛳: <span id="shotPower">0%</span></span>
+                <span>🌀: <span id="shotRoll">0%</span></span>
+                <span>🎯: <span id="shotAccuracy">0%</span></span>
+            </section>
 
-
-            <!-- Pulsante per confermare il tiro -->
-            <div class="shot-row">
-                <button id="shootBtn">Tira!</button>
-            </div>
-
-            <div class="shot-row">
-                <div id="accuracyBarContainer" class="accuracy-bar">
-                    <div id="accuracyFillRight" class="accuracy-fill-right"></div>
-                    <div id="accuracyFillLeft" class="accuracy-fill-left"></div>
-                    <div class="accuracy-center"></div>
+            <!-- Controlli giocatore (sotto la shot-info) -->
+            <section class="player-controls" aria-label="Controlli giocatore">
+                <div class="player-nav">
+                    <div class="top">
+                        <button id="playerLU">↖</button>
+                        <button id="playerUp">↑</button>
+                        <button id="playerRU">↗</button>
+                    </div>
+                    <div class="middle">
+                        <button id="playerLeft">←</button>
+                        <button id="playerNone"> </button>
+                        <button id="playerRight">→</button>
+                    </div>
+                    <div class="bottom">
+                        <button id="playerLD">↙</button>
+                        <button id="playerDown">↓</button>
+                        <button id="playerRD">↘</button>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-        </section>
+            <!-- Controlli tiro -->
+            <section class="shot-controls" aria-label="Controlli tiro" style="display:none;">
+                <!-- Selezione della mazza -->
+                <div class="shot-row">
+                    <div id="clubDeck" class="deck-container"></div>
+                </div>
 
+                <!-- Selezione tipo di tiro -->
+                <div class="shot-row">
+                    <div id="shotDeck" class="deck-container"></div>
+                </div>
 
+                <!-- Pulsante per confermare il tiro -->
+                <div class="shot-row">
+                    <button id="shootBtn">Tira!</button>
+                </div>
+
+                <div class="shot-row">
+                    <div id="accuracyBarContainer" class="accuracy-bar">
+                        <div id="accuracyFillRight" class="accuracy-fill-right"></div>
+                        <div id="accuracyFillLeft" class="accuracy-fill-left"></div>
+                        <div class="accuracy-center"></div>
+                    </div>
+                </div>
+            </section>
+        </aside>
     </main>
     <script src="golfdeck.js"></script>
     <script src="golfclub.js"></script>

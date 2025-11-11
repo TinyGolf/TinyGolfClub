@@ -71,6 +71,7 @@ body {
     width: 40px;
     border-radius: 10px;
     border: none;
+    font-weight:bold;
 }
 
 .wind-indicator {
@@ -169,6 +170,54 @@ body {
 }
 
 #rightBtn {
+    right: 5px;
+}
+
+/* Controlli diagonali agli angoli del quadrato */
+.nav-diagonals {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* per far cliccare solo sui bottoni */
+}
+
+    .nav-diagonals button {
+        position: absolute;
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+        border-radius: 8px;
+        background: rgb(141 192 244 / 66%);
+        border: 1px solid rgb(33 116 180);
+        cursor: pointer;
+        pointer-events: auto;
+        transition: background 0.2s;
+    }
+
+        .nav-diagonals button:hover {
+            background: rgb(101 169 239 / 66%);
+        }
+
+/* Posizionamento angolare preciso */
+#upLeftBtn {
+    top: 5px;
+    left: 5px;
+}
+
+#upRightBtn {
+    top: 5px;
+    right: 5px;
+}
+
+#downLeftBtn {
+    bottom: 5px;
+    left: 5px;
+}
+
+#downRightBtn {
+    bottom: 5px;
     right: 5px;
 }
 
@@ -374,4 +423,165 @@ body {
     pointer-events: none;
     border-radius: 8px;
     z-index: 10;
+}
+
+
+
+/* --- Layout orizzontale (tablet/desktop) --- */
+@media (orientation: landscape) {
+    /* blocca scroll */
+    html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    body {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* topbar rimane in riga singola */
+    .topbar {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5em 1em;
+        flex-shrink: 0;
+    }
+
+    /* container: mappa + right-panel */
+    .container {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        height: calc(100vh - 70px); /* lascia spazio per la topbar */
+        overflow: hidden;
+    }
+
+    /* Fissiamo la dimensione della mappa con una variabile */
+    :root {
+        --map-size: 80vh;
+    }
+
+    /* mappa: sempre quadrata, 80vh */
+    .map-area {
+        flex: 0 0 var(--map-size);
+        width: var(--map-size);
+        height: var(--map-size);
+        min-width: 0;
+        min-height: 0;
+        max-width: calc(var(--map-size));
+        max-height: calc(var(--map-size));
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(10,40,20,0.08);
+        overflow: hidden;
+        background: var(--card);
+        order: 1;
+    }
+
+    #mapCanvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .nav-controls {
+        width: 100%;
+        height: 100%;
+        pointer-events: auto;
+    }
+
+    /* colonna destra: prende lo spazio residuo accanto alla mappa */
+    .right-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: var(--map-size); /* stessa altezza della mappa */
+        width: calc(100vw - var(--map-size) - 56px); /* 56px è un margine di sicurezza */
+        max-width: 40vw;
+        min-width: 220px; /* evita collasso su schermi stretti */
+        box-sizing: border-box;
+        order: 2;
+        align-items: stretch;
+        justify-content: flex-start;
+        overflow: hidden;
+    }
+
+    /* shot-info: in cima, altezza automatica */
+    .shot-info {
+        display: flex;
+        flex-direction: row; /* figli in riga */
+        justify-content: space-around;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 10px;
+        background: rgb(110 183 40);
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 0.95rem;
+        flex: 0 0 auto; /* non si espande: mantiene altezza naturale */
+        box-shadow: 0 3px 8px rgb(0 0 0 / 29%);
+    }
+
+    /* player-controls e shot-controls: occupano tutta la larghezza rimanente
+       e si dividono verticalmente lo spazio rimanente nella right-panel */
+    .player-controls,
+    .shot-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 8px;
+        background: var(--card);
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgb(10 40 20 / 35%);
+        flex: 1 1 0; /* si espandono per riempire lo spazio rimanente */
+        min-height: 0; /* importante per evitare overflow in flex */
+        overflow: hidden;
+    }
+
+        /* se shot-controls è display:none la player-controls prende tutto lo spazio */
+        /* non serve codice extra: flex gestisce automaticamente la suddivisione */
+
+        /* ridimensionamento pulsanti giocatore */
+        .player-controls button {
+            width: 56px;
+            height: 56px;
+            font-size: 22px;
+        }
+
+    /* assicuriamoci che nessun elemento assoluto sovrapponga la mappa:
+       z-index per sicurezza (mapa sopra, right-panel sopra di default) */
+    .map-area {
+        position: relative;
+        z-index: 10;
+    }
+
+    .right-panel {
+        position: relative;
+        z-index: 20;
+    }
+
+    /* piccole regole di fallback per schermi molto larghi o stretti */
+    @media (min-width: 1400px) {
+        .right-panel {
+            max-width: 38vw;
+        }
+    }
+
+    @media (max-width: 1000px) {
+        /* se la viewport è stretta, riduci min-width della right-panel */
+        .right-panel {
+            min-width: 200px;
+            width: calc(100vw - var(--map-size) - 32px);
+        }
+    }
 }
