@@ -1428,7 +1428,8 @@
         if (!isDragging) return;
         const dx = e.clientX - lastX;
         const dy = e.clientY - lastY;
-        moveView(-dx / 3, -dy / 3);
+        const factor = 6; // più alto → più lento
+        moveView(-dx / factor, -dy / factor);
         lastX = e.clientX;
         lastY = e.clientY;
     });
@@ -1449,7 +1450,8 @@
         if (!isDragging || e.touches.length !== 1) return;
         const dx = e.touches[0].clientX - lastX;
         const dy = e.touches[0].clientY - lastY;
-        moveView(-dx / 3, -dy / 3);
+        const factor = 6; // più alto → più lento
+        moveView(-dx / factor, -dy / factor);
         lastX = e.touches[0].clientX;
         lastY = e.touches[0].clientY;
         e.preventDefault(); // evita scroll della pagina
@@ -2290,6 +2292,15 @@
         clearTimeout(window._resizeT);
         window._resizeT = setTimeout(fitCanvas, 200);
     });
+
+    function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas(); // iniziale
 
     regenerate();
     fitCanvas();
