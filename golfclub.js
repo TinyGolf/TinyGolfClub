@@ -16,7 +16,7 @@
     let currentHoleIndex = 0; // indice della buca corrente
     let holeShots = 0;        // colpi attuali nella buca corrente
     let gameHoles = [];       // array di buche generate dalla mappa
-
+    let puttTarget = null;
     const COLORS = {
         rough: "#5a7a3a",
         fairway: "#9fd08b",
@@ -1409,16 +1409,7 @@
         }
     }
 
-    // Eventi frecce
-    upBtn.onclick = () => moveView(0, -5);
-    downBtn.onclick = () => moveView(0, 5);
-    leftBtn.onclick = () => moveView(-5, 0);
-    rightBtn.onclick = () => moveView(5, 0);
-    // Eventi frecce diagonali
-    upLeftBtn.onclick = () => moveView(-5, -5);
-    upRightBtn.onclick = () => moveView(5, -5);
-    downLeftBtn.onclick = () => moveView(-5, 5);
-    downRightBtn.onclick = () => moveView(5, 5);
+
 
     // 🖱️ Trascinamento mappa (mouse)
     let isDragging = false;

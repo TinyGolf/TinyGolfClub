@@ -126,7 +126,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none;
+    pointer-events: none; /* disabilita eventi per il contenitore */
 }
 
     .nav-controls button {
@@ -138,6 +138,7 @@ body {
         cursor: pointer;
         pointer-events: auto;
         transition: background 0.2s;
+        z-index: 5;
     }
 
         .nav-controls button:hover {
@@ -180,7 +181,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    pointer-events: none; /* per far cliccare solo sui bottoni */
+    pointer-events: none; /* disabilita eventi per il contenitore */
 }
 
     .nav-diagonals button {
@@ -194,11 +195,12 @@ body {
         cursor: pointer;
         pointer-events: auto;
         transition: background 0.2s;
+        z-index: 5;
     }
 
-        .nav-diagonals button:hover {
-            background: rgb(101 169 239 / 66%);
-        }
+.nav-diagonals button:hover {
+    background: rgb(101 169 239 / 66%);
+}
 
 /* Posizionamento angolare preciso */
 #upLeftBtn {
