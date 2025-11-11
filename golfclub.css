@@ -150,7 +150,7 @@ body {
 .player-controls {
     display: flex;
     justify-content: center;
-    margin-top: 65px;
+    margin-top: 15px;
 }
 
 .player-nav {
@@ -529,3 +529,4 @@ h2 {
         }
     }
 }
+
