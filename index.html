@@ -13,20 +13,27 @@
             <div class="hole-row top-row">
                 <span class="hole-number">Buca <span id="holeNumber">1</span></span>
                 <span class="hole-par">PAR <span id="holePar">4</span></span>
-                <span class="hole-distance">Distanza: <span id="holeDistance"></span> m</span>
-                <span class="hole-shots">Colpi: <span id="holeShots">0</span></span>
+                <span class="hole-distance">Dist: <span id="holeDistance"></span> m</span>
+                <span class="hole-points">Punti: <span id="holePoint"></span></span>
+
             </div>
             <!-- Riga inferiore: controlli -->
-            <div class="hole-row bottom-row" id="hole-controls">
-                <button id="zoomInBtn">+</button>
-                <button id="zoomOutBtn">−</button>
+            <div class="hole-row mid-row" id="hole-controls">
                 <div id="windIndicator" class="wind-indicator" title="Direzione e forza del vento">
                     <span id="windArrow">➤</span>
                     <span id="windValue">0.0</span>
                 </div>
+                <span class="hole-shots">Colpi: <span id="holeShots">0</span></span>
                 <div id="distanceTravelled" class="distance-travelled">
                     Percorso: <span id="distanceValue">0</span> m
                 </div>
+                <span class="hole-money">Monete: <span id="holeMoney">0</span></span>
+
+            </div>
+
+            <div class="hole-row bottom-row" id="hole-controls">
+                <button id="zoomInBtn">+</button>
+                <button id="zoomOutBtn">−</button>
             </div>
         </div>
     </header>
@@ -35,14 +42,14 @@
         <section class="map-area" aria-label="Mappa di gioco">
             <canvas id="mapCanvas"></canvas>
 
-           
+
         </section>
 
         <!-- WRAPPER: colonna destra che contiene shot-info + controlli -->
         <aside class="right-panel" aria-label="Pannello controlli">
             <!-- Riga info tiro (in cima) -->
             <section id="shot-info" class="shot-info">
-                <span>Distanza: <span id="pointerDistance">0</span> m</span>
+                <span>Dist: <span id="pointerDistance">0</span> m</span>
                 <span>⛳: <span id="shotPower">0%</span></span>
                 <span>🌀: <span id="shotRoll">0%</span></span>
                 <span>🎯: <span id="shotAccuracy">0%</span></span>
@@ -82,9 +89,6 @@
                 </div>
 
                 <!-- Pulsante per confermare il tiro -->
-                <div class="shot-row">
-                    <button id="shootBtn">Tira!</button>
-                </div>
 
                 <div class="shot-row">
                     <div id="accuracyBarContainer" class="accuracy-bar">
@@ -93,9 +97,24 @@
                         <div class="accuracy-center"></div>
                     </div>
                 </div>
+                <div class="shot-row">
+                    <button id="shootBtn">Tira!</button>
+                </div>
+
             </section>
         </aside>
     </main>
+    <!-- MODALE -->
+    <div id="holeSummaryModal" class="modal">
+        <div class="modal-content">
+            <h2>Riepilogo Buca</h2>
+            <table id="holeSummaryTable">
+                <!-- Tabella generata dinamicamente -->
+            </table>
+            <button id="closeModalBtn">Chiudi</button>
+        </div>
+    </div>
+
     <script src="golfdeck.js"></script>
     <script src="golfclub.js"></script>
 </body>

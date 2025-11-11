@@ -83,5 +83,8 @@ const TILE_MODIFIERS = {
     },
     green: {
         default: { distance: 1, roll: 1.5, accuracy: 1 },
+    },
+    water: {
+        default: { distance: 1, roll: 0, accuracy: 1 },
     }
 };
