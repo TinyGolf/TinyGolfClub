@@ -115,6 +115,27 @@
         </div>
     </div>
 
+    <!-- MODALE NEGOZIO -->
+    <div id="shopModal" class="modal">
+        <div class="modal-content">
+            <div class="shop-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>Negozio</h2>
+                <div>
+                    <span>Monete: <span id="shopMoney">0</span></span>
+                    <button id="buyBtn" disabled>Acquista</button>
+                </div>
+            </div>
+
+            <h3>Mazze</h3>
+            <div id="shopClubDeck" class="deck-container"></div>
+
+            <h3>Speciali</h3>
+            <div id="shopShotDeck" class="deck-container"></div>
+
+            <button id="closeShopBtn">Chiudi</button>
+        </div>
+    </div>
+
     <script src="golfdeck.js"></script>
     <script src="golfclub.js"></script>
 </body>

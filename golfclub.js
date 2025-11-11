@@ -6,6 +6,13 @@
     const zoomOutBtn = document.getElementById("zoomOutBtn");
     const playerControls = document.querySelector(".player-controls");
     const shotControls = document.querySelector(".shot-controls");
+    // Apri modale
+    const modal = document.querySelector('.modal');
+    modal.classList.add('show');
+
+    // Chiudi modale
+    modal.classList.remove('show');
+
     let shotTarget = null; // {c: , r: } oppure null se non selezionato
     let lastLandingSpot = null; // { c, r, time }
     // Stato buche
@@ -16,7 +23,17 @@
     let holePoints = 0; // punti accumulati nella buca corrente
     let holeMoney = 0;  // monete guadagnate nella buca corrente
     let holeResults = []; // salva i dati permanenti di ogni buca
-
+    let playerInventory = {
+        clubs: [],
+        specials: []
+    };
+    let shopUsedClubIds = new Set();         // Tutte le mazze già usate globalmente
+    let shopUsedSpecialIds = new Set();
+    let currentShopIndex = 0; // indice dello shop aperto nella modale
+    let shopContents = {};                   // Per negozio: { clubs: [...], specials: [...] }
+    let shopTileIndexes = {};
+    let nextShopIndex = 0;
+    let selectedShopCard = null; // oggetto { type: "club"|"special", card: {...} }
     const COLORS = {
         rough: "#5a7a3a",
         fairway: "#9fd08b",
@@ -24,7 +41,8 @@
         bunker: "#fad087",
         tee: "#ff6b6b",
         hole: "#9be36b",
-        water: "#2f7deb"
+        water: "#2f7deb",
+        shop: "#40320c",
     };
     const LAYERS = {
         ROUGH: 0,
@@ -33,7 +51,8 @@
         GREEN: 3,
         TEE: 4,
         HOLE: 5,
-        WATER: 6
+        WATER: 6,
+        SHOP: 7,  // nuovo layer per il negozio
     };
     const TILE_SCORES = {
         fairway: 10,
@@ -42,6 +61,17 @@
         rough: -5,
         water: -20,
         tee: 0,
+        shop: 0,
+    };
+    const TILE_COINS = {
+        fairway: 4,
+        green: 7,
+        bunker: 1,
+        rough: 2,
+        water: 0,
+        tee: 0,
+        shop: 0,
+        hole: 0,
     };
 
     let view = { x: 0, y: 0, size: 30 };
@@ -59,7 +89,7 @@
 
     // #region costruzione mappa
     const PARS9 = [3, 3, 4, 4, 4, 4, 4, 5, 5];
-    const PAR_RANGES = { 3: [12, 18], 4: [22, 30], 5: [35, 45] };
+    const PAR_RANGES = { 3: [11, 16], 4: [23, 35], 5: [42, 52] };
 
     function createRng(seed = Math.random() * 1e9) {
         let t = seed >>> 0;
@@ -83,13 +113,16 @@
         document.getElementById("holeDistance").textContent = distanceMeters;
         document.getElementById("holeShots").textContent = holeShots;
 
-        // --- Aggiorna i punti totali
+        // --- Aggiorna punti totali
         const totalPoints = gameState.totalScore || 0;
         document.getElementById("holePoint").textContent = totalPoints;
 
-        // --- Aggiorna le monete (puoi definire una regola simile)
-        const totalMoney = holeMoney || 0;
-        document.getElementById("holeMoney").textContent = totalMoney;
+        // --- Aggiorna monete totali (non resettarle)
+        const totalCoins = gameState.totalCoins || 0;
+        document.getElementById("holeMoney").textContent = totalCoins;
+
+        // --- Se vuoi anche le monete della buca corrente
+        // document.getElementById("holeMoneyCurrent").textContent = holeMoney || 0;
     }
 
     function updateDistanceTravelled() {
@@ -235,6 +268,69 @@
                 }
             }
         }
+    }
+
+    function markShop(grid, cols, tee, holeDir, rng) {
+        const size = 2; // dimensione dello shop 2x2
+        const rows = grid.length / cols | 0;
+
+        // Prepara lista dei punti protetti
+        const protectedPoints = [];
+        for (let i = 0; i < grid.length; i++) {
+            const tile = grid[i];
+            if (
+                tile === LAYERS.HOLE ||
+                tile === LAYERS.GREEN ||
+                tile === LAYERS.TEE ||
+                tile === LAYERS.WATER ||
+                tile === LAYERS.BUNKER ||
+                tile === LAYERS.FAIRWAY
+            ) {
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                protectedPoints.push({ c, r });
+            }
+        }
+
+        const tryPlace = (cx, cy) => {
+            for (let y = cy; y < cy + size; y++) {
+                for (let x = cx; x < cx + size; x++) {
+                    if (x < 0 || y < 0 || x >= cols || y >= rows) return false;
+                    if (protectedPoints.some(p => p.c === x && p.r === y)) return false;
+                }
+            }
+            // Se tutte le celle libere, piazza lo shop
+            for (let y = cy; y < cy + size; y++) {
+                for (let x = cx; x < cx + size; x++) {
+                    grid[y * cols + x] = LAYERS.SHOP;
+                }
+            }
+            return true;
+        };
+
+        const distance = 3 + Math.floor(rng() * 3);
+        const directions = [
+            { dx: holeDir.dy, dy: -holeDir.dx }, // destra
+            { dx: -holeDir.dy, dy: holeDir.dx }, // sinistra
+            { dx: -holeDir.dx, dy: -holeDir.dy }, // dietro
+            { dx: holeDir.dx, dy: holeDir.dy }    // davanti
+        ];
+
+        // Mescola le direzioni: prima destra o sinistra random, poi le altre
+        if (rng() < 0.5) directions.reverse();
+
+        for (const dir of directions) {
+            let cx = Math.round(tee.c + dir.dx * distance);
+            let cy = Math.round(tee.r + dir.dy * distance);
+
+            // Assicurati di stare dentro la griglia
+            cx = Math.max(0, Math.min(cx, cols - size));
+            cy = Math.max(0, Math.min(cy, rows - size));
+
+            if (tryPlace(cx, cy)) return; // piazzato con successo
+        }
+
+        // Se non si riesce a piazzare nulla, non piazza lo shop (potresti loggare un warning)
     }
 
     function carveCurvedLine(grid, cols, a, b, width, val, rng) {
@@ -425,8 +521,10 @@
         // --- Costruzione green, tee, fairway, bunker e altezze ---
         for (let h of holes) {
             // Tee
+            // Tee
             markTee(grid, cols, h.tee.c, h.tee.r, LAYERS.TEE);
 
+            
             // Green
             const rx = 3 + Math.round(rng() * 2);
             const ry = 3 + Math.round(rng() * 2);
@@ -452,6 +550,13 @@
 
             // Buca
             grid[h.holePos.r * cols + h.holePos.c] = LAYERS.HOLE;
+            // Negozio ogni 2 buche
+            if ((h.number % 2) === 0) { // buche 2, 4, 6, 8
+                // Passa anche la direzione della buca
+                const dir = directions[getDirIndex(h.dirName)];
+                markShop(grid, cols, h.tee, dir, rng);
+            }
+
         }
 
         return { grid, cols, rows, holes };
@@ -855,6 +960,44 @@
         }
     }
 
+    function drawShops(grid, cols, rows, view, cellPx) {
+        ctx.fillStyle = "white";
+        ctx.font = `${Math.floor(cellPx * 0.9)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        for (let r = 0; r < rows - 1; r++) {
+            for (let c = 0; c < cols - 1; c++) {
+                // Controlla se questo è l'angolo in alto a sinistra di un quadrato 2x2 di SHOP
+                if (
+                    grid[r * cols + c] === LAYERS.SHOP &&
+                    grid[r * cols + (c + 1)] === LAYERS.SHOP &&
+                    grid[(r + 1) * cols + c] === LAYERS.SHOP &&
+                    grid[(r + 1) * cols + (c + 1)] === LAYERS.SHOP
+                ) {
+                    // Centro del quadrato 2x2
+                    const centerX = c + 1; // c + 0.5 + 0.5
+                    const centerY = r + 1; // r + 0.5 + 0.5
+
+                    ctx.save();
+                    ctx.translate((centerX - view.x) * cellPx, (centerY - view.y) * cellPx);
+
+                    // Scala testo: sx = più stretto, sy = più alto
+                    ctx.scale(0.8, 1.5);
+
+                    // Disegna testo centrato
+                    ctx.fillText("SHOP", 0, 0);
+
+                    ctx.restore();
+
+                    // Salta le celle già considerate per evitare ridisegni
+                    c++;
+                    r++;
+                }
+            }
+        }
+    }
+
     function render() {
         if (!currentMap) return;
         const { grid, cols, rows, holes } = currentMap;
@@ -882,13 +1025,14 @@
                 else if (v === LAYERS.GREEN) ctx.fillStyle = COLORS.green;
                 else if (v === LAYERS.TEE) ctx.fillStyle = COLORS.tee;
                 else if (v === LAYERS.HOLE) ctx.fillStyle = COLORS.hole;
+                else if (v === LAYERS.SHOP) ctx.fillStyle = COLORS.shop;
 
                 ctx.fillRect((c - view.x) * cellPx, (r - view.y) * cellPx, cellPx, cellPx);
             }
         }
 
         // Griglia
-        ctx.strokeStyle = "rgba(150,250,150,0.4)";
+        ctx.strokeStyle = "rgba(180,250,180,0.3)";
         ctx.lineWidth = 1;
         for (let r = 0; r <= endR - startR; r++) {
             const y = r * cellPx;
@@ -1059,6 +1203,8 @@
             ctx.textBaseline = "top";
             ctx.fillText(`Par ${h.par}`, teeX, teeY + cellPx * 0.05);
         }
+
+        drawShops(grid, cols, rows, view, cellPx);
 
         // Disegna buche con bandierina e numero tee
         for (const h of holes) {
@@ -1275,6 +1421,16 @@
             gameState.player.c = newC;
             gameState.player.r = newR;
 
+            // --- Controllo negozio ---
+            if (gameState.mode === "player") {
+                const tileType = getTileTypeAt(newC, newR); // o una funzione simile che rileva tile/shop
+                if (tileType === "shop") {
+                    console.log("🛒 Giocatore sul negozio! Apertura modale shop...");
+                    openShopAtPosition(gameState.player.c, gameState.player.r);
+                    return;
+                }
+            }
+
             // Aggiorna la camera a seguire
             if (!gameState.followingPlayer) {
                 gameState.followingPlayer = true;
@@ -1313,6 +1469,7 @@
                     // ✅ 15% imbucata
                     console.log("🏁 Colpo fortunato! Palla imbucata!");
                     finalizeHoleScore();
+                    showHoleSummary();
                     if (!gameState.shotsTotal) gameState.shotsTotal = [];
                     gameState.shotsTotal[currentHoleIndex] = holeShots;
 
@@ -1721,6 +1878,7 @@
             case LAYERS.TEE: return "tee";
             case LAYERS.HOLE: return "green"; // buca: trattiamola come green
             case LAYERS.WATER: return "water";
+            case LAYERS.SHOP: return "shop";
             default: return "fairway";
         }
     }
@@ -1857,7 +2015,7 @@
     function hitPutt(ball, puttTarget, pv, barValue = 50) {
         // --- ⚙️ Parametri ---
         const basePower = Math.max(0.2, barValue / 100);
-        const baseSlopeInfluence = 8;
+        const baseSlopeInfluence = 12;
         const samplingStep = 0.3;
         const maxDeviation = 20;
 
@@ -1871,7 +2029,7 @@
         const dirY = dy / dist;
 
         // --- Influenza pendenza ---
-        const minDist = 4;
+        const minDist = 3;
         const maxDist = 12;
         const distFactor = Math.min(1, Math.max(0, (dist - minDist) / (maxDist - minDist)));
         const slopeInfluence = baseSlopeInfluence * distFactor;
@@ -2237,89 +2395,58 @@
         clubDeck.innerHTML = "";
         shotDeck.innerHTML = "";
 
-        Clubs.sort((a, b) => a.num - b.num);
-        Clubs.forEach(club => {
+        // Ordina le mazze per .num
+        const sortedClubs = [...playerInventory.clubs].sort((a, b) => a.num - b.num);
+        sortedClubs.forEach(club => {
             const card = document.createElement("div");
             card.className = "deck-card";
             card.dataset.name = club.name;
 
-            // Colori per tipo di club
+            // Colori come prima
             switch (club.id) {
-                case 'putt':
-                    card.style.backgroundColor = '#000'; // nero
-                    card.style.color = '#fff'; // scritte bianche
-                    break;
+                case 'putt': card.style.backgroundColor = '#000'; card.style.color = '#fff'; break;
                 case 'sand':
                 case 'pitch':
-                case 'wedge':
-                    card.style.backgroundColor = '#87CEFA'; // azzurro chiaro
-                    card.style.color = '#000';
-                    break;
-                case 'iron':
-                    card.style.backgroundColor = '#d3d3d3'; // grigio chiaro
-                    card.style.color = '#000';
-                    break;
-                case 'wood':
-                    card.style.backgroundColor = '#A0522D'; // marroncino
-                    card.style.color = '#000';
-                    break;
-                case 'driver':
-                    card.style.backgroundColor = '#555555'; // marroncino anche per driver
-                    card.style.color = '#fff';
-                    break;
-                default:
-                    card.style.backgroundColor = '#fff';
-                    card.style.color = '#000';
+                case 'wedge': card.style.backgroundColor = '#87CEFA'; card.style.color = '#000'; break;
+                case 'iron': card.style.backgroundColor = '#d3d3d3'; card.style.color = '#000'; break;
+                case 'wood': card.style.backgroundColor = '#A0522D'; card.style.color = '#000'; break;
+                case 'driver': card.style.backgroundColor = '#555555'; card.style.color = '#fff'; break;
+                default: card.style.backgroundColor = '#fff'; card.style.color = '#000';
             }
 
-            // Simbolini per distance, roll e accuracy
             card.innerHTML = `
-            <div class="name">${club.name}</div>
-            <div class="stats">
-                ⛳ ${club.distance} &nbsp; 🌀 ${club.roll} &nbsp; 🎯 ${Math.round(club.accuracy * 100)}%
-            </div>
-            <div class="desc">${club.desc}</div>
-        `;
+        <div class="name">${club.name}</div>
+        <div class="stats">
+            ⛳ ${club.distance} &nbsp; 🌀 ${club.roll} &nbsp; 🎯 ${Math.round(club.accuracy * 100)}%
+        </div>
+        <div class="desc">${club.desc}</div>
+    `;
+
             card.onclick = () => selectClub(club.name);
             clubDeck.appendChild(card);
         });
 
-        Specials.forEach(shot => {
+        // Ordina gli specials per .num
+        const sortedSpecials = [...playerInventory.specials].sort((a, b) => a.num - b.num);
+        sortedSpecials.forEach(shot => {
             const card = document.createElement("div");
             card.className = "deck-card";
             card.dataset.name = shot.name;
 
-            // Colori in base al tipo di shot
             switch (shot.id) {
-                case 'power':
-                    card.style.backgroundColor = '#ff0000'; // arancione acceso
-                    card.style.color = '#fff';
-                    break;
-                case 'spin':
-                    card.style.backgroundColor = '#1E90FF'; // blu intenso
-                    card.style.color = '#fff';
-                    break;
-                case 'accuracy':
-                    card.style.backgroundColor = '#ff9500'; // verde lime
-                    card.style.color = '#000';
-                    break;
-                case 'special':
-                    card.style.backgroundColor = '#8A2BE2'; // viola
-                    card.style.color = '#fff';
-                    break;
-                case 'wind':
-                    card.style.backgroundColor = '#03fca1'; // viola
-                    card.style.color = '#000000';
-                    break;
-                default:
-                    card.style.backgroundColor = '#ccc'; // grigio neutro
-                    card.style.color = '#000';
+                case 'power': card.style.backgroundColor = '#ff0000'; card.style.color = '#fff'; break;
+                case 'spin': card.style.backgroundColor = '#1E90FF'; card.style.color = '#fff'; break;
+                case 'accuracy': card.style.backgroundColor = '#ff9500'; card.style.color = '#000'; break;
+                case 'special': card.style.backgroundColor = '#8A2BE2'; card.style.color = '#fff'; break;
+                case 'wind': card.style.backgroundColor = '#03fca1'; card.style.color = '#000'; break;
+                default: card.style.backgroundColor = '#ccc'; card.style.color = '#000';
             }
 
             card.innerHTML = `
         <div class="name">${shot.name}</div>
         <div class="desc">${shot.desc}</div>
     `;
+
             card.onclick = () => selectSpecial(shot.name);
             shotDeck.appendChild(card);
         });
@@ -2328,42 +2455,83 @@
 
     // Funzioni di selezione
     function selectClub(name) {
-        selectedClub = Clubs.find(c => c.name === name);
+        // Cerca nel playerInventory
+        selectedClub = playerInventory.clubs.find(c => c.name === name);
+        if (!selectedClub) return; // sicurezza
+
         document.querySelectorAll("#clubDeck .deck-card")
             .forEach(c => c.classList.toggle("selected", c.dataset.name === name));
+
         updateShotInfo(shotTarget || gameState.ball);
         render();
     }
 
     function selectSpecial(name) {
-        selectedSpecial = Specials.find(s => s.name === name);
+        // Cerca nel playerInventory
+        selectedSpecial = playerInventory.specials.find(s => s.name === name);
+        if (!selectedSpecial) return; // sicurezza
 
         document.querySelectorAll("#shotDeck .deck-card")
             .forEach(c => c.classList.toggle("selected", c.dataset.name === name));
 
-        // ✅ Se lo special influisce sul vento, aggiorna subito la forza e il display
         if (selectedSpecial?.id === "wind") {
-            // Applica moltiplicatore
-            const baseWind = wind.baseStrength ?? wind.strength; // salva il vento originale una sola volta
+            const baseWind = wind.baseStrength ?? wind.strength;
             if (!wind.baseStrength) wind.baseStrength = baseWind;
 
-            wind.strength = wind.baseStrength * (selectedSpecial.windMultiplier ?? 1);
+            wind.strength = baseWind * (selectedSpecial.windMultiplier ?? 1);
             updateWindDisplay();
-
-            console.log(`💨 Vento modificato: base=${baseWind.toFixed(2)}, attuale=${wind.strength.toFixed(2)} (×${selectedSpecial.windMultiplier})`);
         } else if (wind.baseStrength) {
-            // Se cambio carta e il vento era stato modificato, ripristinalo
             wind.strength = wind.baseStrength;
             updateWindDisplay();
         }
 
-        // Aggiorna HUD
         updateShotInfo(shotTarget || gameState.ball);
+    }
+
+    function initPlayerInventory() {
+        // Mazze
+        const woods = Clubs.filter(c => c.id === 'wood');
+        const irons = Clubs.filter(c => c.id === 'iron');
+        const wedges = Clubs.filter(c => ['wedge', 'sand', 'pitch'].includes(c.id));
+        const putt = Clubs.find(c => c.id === 'putt');
+
+        // Scegliamo casualmente
+        const randomChoice = (arr, n = 1) => {
+            const copy = [...arr];
+            const chosen = [];
+            for (let i = 0; i < n; i++) {
+                if (copy.length === 0) break;
+                const idx = Math.floor(Math.random() * copy.length);
+                chosen.push(copy.splice(idx, 1)[0]);
+            }
+            return chosen;
+        };
+
+        playerInventory.clubs = [
+            ...randomChoice(woods, 1),
+            ...randomChoice(irons, 2),
+            ...randomChoice(wedges, 1),
+            putt
+        ];
+
+        // Specials
+        const powerSpin = Specials.filter(s => ['power', 'spin'].includes(s.id));
+        const special = Specials.filter(s => s.id === 'special');
+        const accuracyWind = Specials.filter(s => ['accuracy', 'wind'].includes(s.id));
+        const normale = Specials.find(c => c.id === 'normale');
+        playerInventory.specials = [
+            normale,
+            ...randomChoice(powerSpin, 1),
+            ...randomChoice(special, 1),
+            ...randomChoice(accuracyWind, 1),
+        ];
+
+        console.log("Inventario iniziale:", playerInventory);
     }
 
     // #endregion
 
-    // #region Punteggi
+    // #region Punteggi e monete
 
     // --- Punteggio del singolo colpo ---
     // --- Punteggio del singolo colpo ---
@@ -2381,6 +2549,20 @@
         }
     }
 
+    // --- Funzione che restituisce le monete del colpo
+    function coinsShot(tileType, shotNumber, par) {
+        if (tileType === "green") {
+            // solo colpi 2 sotto par
+            if (shotNumber === par - 2) {
+                return TILE_COINS[tileType] || 0;
+            } else {
+                return 0;
+            }
+        } else {
+            // tutte le altre tile vengono valutate sempre
+            return TILE_COINS[tileType] || 0;
+        }
+    }
     // --- Punteggio della buca in base ai colpi ---
     function scoreHole(holeIndex, shots) {
         const hole = gameHoles[holeIndex];
@@ -2388,59 +2570,84 @@
 
         const par = hole.par;
         const shotCount = shots[holeIndex] || 0;
-
-        if (shotCount === par - 2) return 50;   // eagle
-        if (shotCount === par - 1) return 30;   // birdie
-        if (shotCount === par) return 20;   // par
+        if (shotCount === 1) return 200;   // hole in one
+        if (shotCount === par - 3) return 120;   // albatross
+        if (shotCount === par - 2) return 75;   // eagle
+        if (shotCount === par - 1) return 40;   // birdie
+        if (shotCount === par) return 25;   // par
         if (shotCount === par + 1) return 10;   // bogey
+        if (shotCount === par + 2) return 5;   // double bogey
+
+
         return 0;
     }
 
+    // --- Monete finali della buca
+    function coinsHole(holeIndex, shots) {
+        const hole = gameHoles[holeIndex];
+        if (!hole) return 0;
+        const shotCount = shots[holeIndex] || 0;
+        // bonus monete alla fine della buca in base al risultato
+        if (shotCount ===1) return 50;   // eagle o migliore
+        if (shotCount === hole.par - 2) return 25;   // eagle o migliore
+        if (shotCount === hole.par - 2) return 15;   // eagle o migliore
+        if (shotCount === hole.par - 1) return 8;   // eagle o migliore
+        if (shotCount === hole.par) return 5;      // par
+        if (shotCount === hole.par+1) return 3;      // par
+        if (shotCount === hole.par+2) return 2;      // par
+
+        return 1;                                   // altrimenti piccolo bonus
+    }
     // --- Aggiornamento punteggio colpo ---
     // Aggiornamento punteggio colpo
+    // --- Aggiornamento colpo
     function updateShotScore() {
         const ballC = Math.round(gameState.ball.c);
         const ballR = Math.round(gameState.ball.r);
         const tileType = getTileTypeAt(ballC, ballR);
-
         const par = gameHoles[currentHoleIndex]?.par || 3;
 
+        // Punti
         const shotScore = scoreShot(tileType, holeShots, par);
+        gameState.totalScore = (gameState.totalScore || 0) + shotScore;
+        holePoints = shotScore;
 
-        if (!gameState.totalScore) gameState.totalScore = 0;
-        gameState.totalScore += shotScore;
+        // Monete
+        const shotCoins = coinsShot(tileType, holeShots, par);
+        gameState.totalCoins = (gameState.totalCoins || 0) + shotCoins;
+        holeMoney = (holeMoney || 0) + shotCoins;
 
-        // --- Aggiorna anche la variabile letta dall'HUD ---
-        holePoints = shotScore;   // se vuoi sommare tutti i colpi: holePoints += shotScore;
+        console.log(`🎯 Tile: ${tileType}, Colpo: ${holeShots}, Punti: ${shotScore}, Monete: ${shotCoins}, Totale punti: ${gameState.totalScore}, Totale monete: ${gameState.totalCoins}`);
 
-        console.log(`🎯 Tile: ${tileType}, Colpo: ${holeShots}, Punti colpo: ${shotScore}, Totale: ${gameState.totalScore}`);
-
-        // Aggiorna subito la HUD
         updateHoleHUD();
     }
 
-    // Alla fine della buca
+    // --- Fine buca
     function finalizeHoleScore() {
         if (!gameState.shotsTotal) gameState.shotsTotal = [];
         gameState.shotsTotal[currentHoleIndex] = holeShots;
 
         const holeScore = scoreHole(currentHoleIndex, gameState.shotsTotal);
+        gameState.totalScore = (gameState.totalScore || 0) + holeScore;
 
-        if (!gameState.totalScore) gameState.totalScore = 0;
-        gameState.totalScore += holeScore;
+        const holeCoins = coinsHole(currentHoleIndex, gameState.shotsTotal);
+        gameState.totalCoins = (gameState.totalCoins || 0) + holeCoins;
+        holeMoney += holeCoins; // aggiunge bonus fine buca
 
-        console.log(`🏌️ Buco ${currentHoleIndex + 1} completato! Punteggio buca: ${holeScore}, Totale: ${gameState.totalScore}`);
+        console.log(`🏌️ Buco ${currentHoleIndex + 1} completato! Punti buca: ${holeScore}, Monete buca: ${holeMoney}, Totale punti: ${gameState.totalScore}, Totale monete: ${gameState.totalCoins}`);
 
-        // ✅ Salva dati permanenti di questa buca
+        // Salva dati permanenti
         holeResults[currentHoleIndex] = {
             number: gameHoles[currentHoleIndex].number,
             par: gameHoles[currentHoleIndex].par,
             shots: holeShots,
-            score: holeScore
+            score: holeScore,
+            coins: holeMoney
         };
 
-        // Reset colpi per la prossima buca
+        // Reset colpi e monete per prossima buca
         holeShots = 0;
+        holeMoney = 0;
     }
 
     function showHoleSummary() {
@@ -2493,14 +2700,344 @@
         table.appendChild(rowPar);
         table.appendChild(rowShots);
 
-        // Mostra la modale
-        document.getElementById("holeSummaryModal").style.display = "flex";
+        // Mostra la modale tramite classe .show
+        const modal = document.getElementById("holeSummaryModal");
+        modal.classList.add("show");
 
         // Chiudi modale
         document.getElementById("closeModalBtn").onclick = () => {
-            document.getElementById("holeSummaryModal").style.display = "none";
+            modal.classList.remove("show");
         };
     }
+
+
+
+    function openShopAtPosition(c, r) {
+        const tileC = Math.floor(c);
+        const tileR = Math.floor(r);
+
+        // Controlla se esiste già uno shop vicino (entro 1 tile)
+        let foundKey = null;
+        for (const key in shopTileIndexes) {
+            const [baseC, baseR] = key.split(',').map(Number);
+            if (Math.abs(baseC - tileC) <= 1 && Math.abs(baseR - tileR) <= 1) {
+                foundKey = key;
+                break;
+            }
+        }
+
+        let shopIndex;
+        let key;
+
+        if (foundKey) {
+            // Usa lo shop già esistente nel cluster
+            key = foundKey;
+            shopIndex = shopTileIndexes[key];
+        } else {
+            // Crea un nuovo shop
+            key = `${tileC},${tileR}`;
+            shopTileIndexes[key] = nextShopIndex++;
+            shopIndex = shopTileIndexes[key];
+        }
+
+        console.log(`🛍️ Aprendo shop index=${shopIndex} alla posizione base ${key}`);
+        openShopModal(shopIndex);
+    }
+    function openShopModal(shopIndex) {
+        currentShopIndex = shopIndex; // variabile globale
+        const shopModal = document.getElementById("shopModal");
+        shopModal.classList.add("show");
+        populateShopDecks(shopIndex);
+    }
+
+    function closeShopModal() {
+        const shopModal = document.getElementById("shopModal");
+        shopModal.classList.remove("show"); // <- rimuove l'effetto
+        currentShopIndex = null;
+    }
+
+    document.getElementById("closeShopBtn").onclick = closeShopModal;
+
+    // --- helper ---
+    function shuffle(array) {
+        const a = array.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }
+
+    // pool globali (vengono creati da initShopPools)
+    let shopPoolClubs = [];
+    let shopPoolSpecials = [];
+
+    // chiamare questa funzione una volta all'inizio (dopo che playerInventory è pronto)
+    function initShopPools() {
+        const ownedClubNames = new Set(playerInventory.clubs.map(c => c.name));
+        const ownedSpecialNames = new Set(playerInventory.specials.map(s => s.name));
+
+        // pool di carte non possedute
+        const nonOwnedClubs = Clubs.filter(c => !ownedClubNames.has(c.name));
+        const nonOwnedSpecials = Specials.filter(s => !ownedSpecialNames.has(s.name));
+
+        // shuffle e memorizza
+        shopPoolClubs = shuffle(nonOwnedClubs);
+        shopPoolSpecials = shuffle(nonOwnedSpecials);
+
+        console.log("🏪 Pools inizializzati:",
+            shopPoolClubs.map(c => c.name),
+            shopPoolSpecials.map(s => s.name)
+        );
+    }
+
+    // Questa funzione prende 'count' elementi casuali dall'array 'source' escludendo quelli presenti in 'excludeArr'.
+    // Se non ci sono abbastanza elementi unici, permette di ripescare (fallback) da source rimanente.
+    function pickRandomUnique(source, count, excludeArr = []) {
+        const result = [];
+        const excludeIds = new Set(excludeArr.map(x => x.id));
+        const pool = source.filter(x => !excludeIds.has(x.id));
+
+        // prima prendi da pool finché possibile
+        const poolCopy = pool.slice();
+        while (result.length < count && poolCopy.length > 0) {
+            const idx = Math.floor(Math.random() * poolCopy.length);
+            result.push(poolCopy.splice(idx, 1)[0]);
+        }
+
+        // se ancora mancano, prendi da source (che include anche elementi già visti), escludendo però duplicati nella result
+        const need = count - result.length;
+        if (need > 0) {
+            const fallbackCandidates = source.filter(s => !result.some(r => r.id === s.id));
+            while (result.length < count && fallbackCandidates.length > 0) {
+                const idx = Math.floor(Math.random() * fallbackCandidates.length);
+                result.push(fallbackCandidates.splice(idx, 1)[0]);
+            }
+        }
+
+        return result;
+    }
+
+    // ---- populateShopDecks usando pool sequenziali ----
+    const CLUBS_PER_SHOP = 4;
+    const SPECIALS_PER_SHOP = 3;
+
+    function populateShopDecks(shopIndex) {
+        const clubDeck = document.getElementById("shopClubDeck");
+        const shotDeck = document.getElementById("shopShotDeck");
+        if (!clubDeck || !shotDeck) return;
+
+        clubDeck.innerHTML = "";
+        shotDeck.innerHTML = "";
+
+        // Se lo shop è già popolato
+        if (shopContents[shopIndex]) {
+            renderShopCards(shopContents[shopIndex].clubs, shopContents[shopIndex].specials);
+            console.log(`🛍️ Shop index=${shopIndex} già popolato`);
+            console.log(`  Clubs: ${shopContents[shopIndex].clubs.map(c => c.name).join(", ")}`);
+            console.log(`  Specials: ${shopContents[shopIndex].specials.map(s => s.name).join(", ")}`);
+            return;
+        }
+
+        const playerClubNames = new Set(playerInventory.clubs.map(c => c.name));
+        const playerSpecialNames = new Set(playerInventory.specials.map(s => s.name));
+
+        // Pool iniziale: solo mazze/special non possedute dal giocatore
+        let availableClubs = Clubs.filter(c =>
+            !playerInventory.clubs.some(pc => pc.name === c.name) &&
+            !Object.values(shopContents).flatMap(s => s.clubs).some(sc => sc.name === c.name)
+        );
+        let availableSpecials = Specials.filter(s =>
+            !playerInventory.specials.some(ps => ps.name === s.name) &&
+            !Object.values(shopContents).flatMap(sch => sch.specials).some(ss => ss.name === s.name)
+        );
+
+        // Rimuovi carte già usate negli shop precedenti
+        for (let i = 0; i < shopIndex; i++) {
+            if (shopContents[i]) {
+                const usedClubNames = shopContents[i].clubs.map(c => c.name);
+                availableClubs = availableClubs.filter(c => !usedClubNames.includes(c.name));
+
+                const usedSpecialNames = shopContents[i].specials.map(s => s.name);
+                availableSpecials = availableSpecials.filter(s => !usedSpecialNames.includes(s.name));
+            }
+        }
+
+        // Seleziona mazze e special per questo shop
+        const shopClubs = pickRandomUnique(availableClubs, CLUBS_PER_SHOP, []);
+        const shopSpecials = pickRandomUnique(availableSpecials, SPECIALS_PER_SHOP, []);
+
+        // Se non bastano, pesca dal pool totale di mazze/special non possedute dal giocatore
+        if (shopClubs.length < CLUBS_PER_SHOP) {
+            const missing = CLUBS_PER_SHOP - shopClubs.length;
+            const fallback = pickRandomUnique(
+                Clubs.filter(c => !playerClubNames.has(c.name)),
+                missing,
+                shopClubs
+            );
+            shopClubs.push(...fallback);
+        }
+
+        if (shopSpecials.length < SPECIALS_PER_SHOP) {
+            const missing = SPECIALS_PER_SHOP - shopSpecials.length;
+            const fallback = pickRandomUnique(
+                Specials.filter(s => !playerSpecialNames.has(s.name)),
+                missing,
+                shopSpecials
+            );
+            shopSpecials.push(...fallback);
+        }
+
+        // Salva nello shopContents
+        shopContents[shopIndex] = { clubs: shopClubs, specials: shopSpecials };
+
+        // Log completo
+        console.log(`🛍️ Shop index=${shopIndex}`);
+        console.log(`  Pool rimanente Clubs: ${availableClubs.map(c => c.name).join(", ")}`);
+        console.log(`  Mazze selezionate: ${shopClubs.map(c => c.name).join(", ")}`);
+        console.log(`  Pool rimanente Specials: ${availableSpecials.map(s => s.name).join(", ")}`);
+        console.log(`  Specials selezionati: ${shopSpecials.map(s => s.name).join(", ")}`);
+
+        // Render
+        renderShopCards(shopClubs, shopSpecials);
+    }
+
+    function renderShopCards(shopClubs, shopSpecials) {
+        const clubDeck = document.getElementById("shopClubDeck");
+        const shotDeck = document.getElementById("shopShotDeck");
+
+        clubDeck.innerHTML = "";
+        shotDeck.innerHTML = "";
+
+        // Render clubs
+        shopClubs.forEach(club => {
+            const card = document.createElement("div");
+            card.className = "deck-card";
+            card.dataset.shopName = club.name; // usa data-shop-name per selezione
+
+            switch (club.id) {
+                case 'putt': card.style.backgroundColor = '#000'; card.style.color = '#fff'; break;
+                case 'sand':
+                case 'pitch':
+                case 'wedge': card.style.backgroundColor = '#87CEFA'; card.style.color = '#000'; break;
+                case 'iron': card.style.backgroundColor = '#d3d3d3'; card.style.color = '#000'; break;
+                case 'wood': card.style.backgroundColor = '#A0522D'; card.style.color = '#000'; break;
+                case 'driver': card.style.backgroundColor = '#555555'; card.style.color = '#fff'; break;
+                default: card.style.backgroundColor = '#fff'; card.style.color = '#000';
+            }
+
+            card.innerHTML = `
+            <div class="name">${club.name}</div>
+            <div class="stats">
+                ⛳ ${club.distance} &nbsp; 🌀 ${club.roll} &nbsp; 🎯 ${Math.round(club.accuracy * 100)}%
+            </div>
+            <div class="desc">${club.desc}</div>
+            <div class="price">💰 ${club.cost}</div>
+        `;
+
+            card.onclick = () => selectShopCard("club", club);
+            clubDeck.appendChild(card);
+        });
+
+        // Render specials
+        shopSpecials.forEach(shot => {
+            const card = document.createElement("div");
+            card.className = "deck-card";
+            card.dataset.shopName = shot.name; // usa data-shop-name per selezione
+
+            switch (shot.id) {
+                case 'power': card.style.backgroundColor = '#ff0000'; card.style.color = '#fff'; break;
+                case 'spin': card.style.backgroundColor = '#1E90FF'; card.style.color = '#fff'; break;
+                case 'accuracy': card.style.backgroundColor = '#ff9500'; card.style.color = '#000'; break;
+                case 'special': card.style.backgroundColor = '#8A2BE2'; card.style.color = '#fff'; break;
+                case 'wind': card.style.backgroundColor = '#03fca1'; card.style.color = '#000'; break;
+                default: card.style.backgroundColor = '#ccc'; card.style.color = '#000';
+            }
+
+            card.innerHTML = `
+            <div class="name">${shot.name}</div>
+            <div class="desc">${shot.desc}</div>
+            <div class="price">💰 ${shot.cost}</div>
+        `;
+
+            card.onclick = () => selectShopCard("special", shot);
+            shotDeck.appendChild(card);
+        });
+
+        // Aggiorna le monete nella modale
+        const shopMoneyEl = document.getElementById("shopMoney");
+        if (shopMoneyEl) shopMoneyEl.textContent = playerInventory.money;
+
+        // Disabilita pulsante acquista se nessuna carta selezionata o soldi insufficienti
+        const buyBtn = document.getElementById("buyBtn");
+        if (buyBtn) buyBtn.disabled = true;
+
+        selectedShopCard = null; // reset selezione
+    }
+
+    function selectShopCard(type, card) {
+        // Deseleziona tutte le carte precedentemente selezionate
+        document.querySelectorAll("#shopClubDeck .deck-card, #shopShotDeck .deck-card")
+            .forEach(c => c.classList.remove("selected"));
+
+        // Trova l'elemento della carta cliccata usando data-shop-name
+        const cardEl = document.querySelector(`[data-shop-name='${card.name}']`);
+        if (cardEl) cardEl.classList.add("selected");
+
+        // Salva la selezione globale
+        selectedShopCard = { type, card };
+
+        // Controlla se il giocatore ha abbastanza monete per comprarla
+        const canBuy = card.cost <= playerInventory.money;
+
+        const buyBtn = document.getElementById("buyBtn");
+        if (buyBtn) buyBtn.disabled = !canBuy;
+
+        // Eventuale feedback visivo se non puoi comprare
+        if (!canBuy && cardEl) {
+            cardEl.style.opacity = 0.6; // evidenzia che non puoi comprare
+        } else if (cardEl) {
+            cardEl.style.opacity = 1;
+        }
+    }
+
+    function buySelectedCard() {
+        if (!selectedShopCard) return;
+
+        const { type, card } = selectedShopCard;
+
+        if (playerInventory.money >= card.cost) {
+            // Sottrai monete
+            playerInventory.money -= card.cost;
+
+            // Aggiungi carta all'inventario del giocatore
+            if (type === "club") playerInventory.clubs.push(card);
+            else playerInventory.specials.push(card);
+
+            // Rimuovi dal pool dei negozi
+            Object.values(shopContents).forEach(shop => {
+                if (type === "club") shop.clubs = shop.clubs.filter(c => c.name !== card.name);
+                else shop.specials = shop.specials.filter(s => s.name !== card.name);
+            });
+
+            // Aggiorna HUD monete
+            document.getElementById("holeMoney").textContent = playerInventory.money;
+            document.getElementById("shopMoney").textContent = playerInventory.money;
+
+            // Ripopola la modale senza la carta appena comprata
+            populateShopDecks(currentShopIndex);
+
+            // ✅ Aggiorna anche il deck del giocatore!
+            populateDecks();
+
+            selectedShopCard = null;
+            document.getElementById("buyBtn").disabled = true;
+        } else {
+            alert("Non hai abbastanza monete!");
+        }
+    }
+
+    document.getElementById("buyBtn").onclick = buySelectedCard;
 
     // #endregion
 
@@ -2597,10 +3134,44 @@
         setTimeout(() => msg.remove(), 1500);
     }
 
+    function resetShops() {
+        shopUsedClubIds.clear();
+        shopUsedSpecialIds.clear();
+        shopContents = {};
+    }
+
+    resetShops();
     regenerate();
     fitCanvas();
     updateControlsUI();
     updateWindDisplay();
+    function debugPrintAllShops() {
+        console.log("🛍️ Contenuto di tutti e 4 i negozi all'avvio:");
+
+        for (let shopIndex = 0; shopIndex < 4; shopIndex++) {
+            // Popola lo shop senza modificare il DOM
+            if (!shopContents[shopIndex]) {
+                populateShopDecks(shopIndex);
+            }
+
+            const shop = shopContents[shopIndex];
+            if (shop) {
+                console.log(`\n🏪 Shop index=${shopIndex}`);
+                console.log(`  Mazze: ${shop.clubs.map(c => c.name).join(", ")}`);
+                console.log(`  Specials: ${shop.specials.map(s => s.name).join(", ")}`);
+            } else {
+                console.log(`🏪 Shop index=${shopIndex} non popolato`);
+            }
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        initPlayerInventory(); // crea l’inventario iniziale
+        initShopPools();       // crea i pool filtrati
+        populateDecks();       // popola i deck con le carte dell’inventario
+        debugPrintAllShops();  // genera e stampa i negozi
+    });
 
     // #endregion
+
 })();

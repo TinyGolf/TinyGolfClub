@@ -150,7 +150,7 @@ body {
 .player-controls {
     display: flex;
     justify-content: center;
-    margin-top: 15px;
+    margin-top: 65px;
 }
 
 .player-nav {
@@ -336,16 +336,26 @@ body {
 
 
 .modal {
-    display: none; /* nascosta di default */
+    z-index: 9999; /* sopra tutto */
+    display: flex; /* serve per centrare il contenuto */
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0); /* inizialmente trasparente */
     justify-content: center;
     align-items: center;
+    opacity: 0; /* invisibile di default */
+    pointer-events: none; /* non cliccabile finché nascosta */
+    transition: opacity 0.3s ease;
 }
+
+    .modal.show {
+        background: rgba(0,0,0,0.5); /* sfondo semi-trasparente */
+        opacity: 1;
+        pointer-events: auto;
+    }
 
 .modal-content {
     background: white;
@@ -354,6 +364,14 @@ body {
     text-align: center;
     max-width: 600px;
     width: 90%;
+    transform: scale(0.95); /* leggermente rimpicciolito di default */
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+.modal.show .modal-content {
+    transform: scale(1); /* dimensione piena */
+    opacity: 1;
 }
 
 table {
@@ -529,4 +547,3 @@ h2 {
         }
     }
 }
-
